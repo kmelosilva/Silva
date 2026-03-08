@@ -49,8 +49,7 @@ Inicie o servidor:
 
 php artisan serve
 
----
-```md
+
 A API estará disponível em:
 
 http://127.0.0.1:8000
