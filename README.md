@@ -49,6 +49,7 @@ Inicie o servidor:
 
 php artisan serve
 
+---
 
 A API estará disponível em:
 
