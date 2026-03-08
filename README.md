@@ -65,19 +65,19 @@ Authorization: Bearer SEU_TOKEN
 Rotas principais
 Método	Rota	Descrição
 POST	/api/register	    Registrar usuário
-![Register](images/Captura de Tela 2026-03-07 às 21.30.56.png)
+![Register](images/register.png)
 
 POST	/api/login	        Login do usuário
-![Login](images/Captura de Tela 2026-03-07 às 21.30.52.png)
+![Login](images/login.png)
 
 GET	    /api/missions	    Lista todas as missões
-![Missions](images/Captura de Tela 2026-03-07 às 21.42.14.png)
+![Missions](images/missions.png)
 
 GET	    /api/missions/my    Lista todas as missões do usuário
-![MissionsByUser](images/Captura de Tela 2026-03-07 às 21.30.43.png)
+![MissionsByUser](images/missions_by_user.png)
 
 GET	    /api/missions/today    Lista todas as missões do dia do usuário
-![MissionsByUserToday](images/Captura de Tela 2026-03-07 às 21.30.50.png)
+![MissionsByUserToday](images/missions_today_by_user.png)
 
 Autor
 
