@@ -1,4 +1,4 @@
-<?php 
+<?php
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\MissionController;
@@ -10,6 +10,7 @@ Route::post('/login', [AuthController::class, 'login']);
 
 Route::middleware('auth:sanctum')->group(function () {
 
+    Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/missions', [MissionController::class, 'index']);
     Route::get('/missions/today', [UserMissionController::class, 'todayMissions']);
     Route::get('/missions/my', [UserMissionController::class, 'allMissions']);
