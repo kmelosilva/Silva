@@ -2,9 +2,12 @@
 
 namespace Database\Factories;
 
+use App\Enums\Category;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
+ * Só para testes: dado inventado não entra no seed do projeto.
+ *
  * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Mission>
  */
 class MissionFactory extends Factory
@@ -16,13 +19,21 @@ class MissionFactory extends Factory
      */
     public function definition(): array
     {
-        $categories = ['saude', 'mente', 'corpo', 'disciplina', 'financas'];
-
         return [
+            'slug' => $this->faker->unique()->slug(3),
             'title' => $this->faker->sentence(3),
             'description' => $this->faker->sentence(),
-            'xp' => $this->faker->numberBetween(10, 50),
-            'category' => $this->faker->randomElement($categories)
+            'category' => $this->faker->randomElement(Category::cases()),
+            'is_entry' => false,
+            'position' => 0,
         ];
+    }
+
+    /**
+     * Como as missões que o gerador criava antes do catálogo existir: sem slug.
+     */
+    public function generated(): static
+    {
+        return $this->state(fn () => ['slug' => null]);
     }
 }

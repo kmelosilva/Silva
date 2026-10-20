@@ -1,15 +1,24 @@
 <?php
+
 namespace App\Http\Controllers;
+
+use App\Http\Resources\MissionResource;
 use App\Models\Mission;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class MissionController extends Controller
 {
-    public function index()
+    /**
+     * As missões dos módulos, na ordem do catálogo, com as coordenadas publicadas em ordem.
+     */
+    public function index(): AnonymousResourceCollection
     {
-        $missions = Mission::all();
+        $missions = Mission::query()
+            ->inModules()
+            ->with('publishedCoordinates')
+            ->orderBy('position')
+            ->get();
 
-        return response()->json([
-            'data' => $missions
-        ], 200);
+        return MissionResource::collection($missions);
     }
 }
