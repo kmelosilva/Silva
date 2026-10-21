@@ -325,7 +325,8 @@ class EnlistmentTest extends TestCase
 
         $this->assertSame(array_column(Category::cases(), 'value'), array_column($areas, 'key'));
         $counts = array_column($areas, 'missions_count', 'key');
-        $this->assertSame(0, $counts['saude'], 'Área sem missão também aparece, com 0.');
+        $this->assertSame(0, $counts['social'], 'Área sem missão também aparece, com 0.');
+        $this->assertSame(1, $counts['saude']);
         $this->assertSame(Mission::inModules()->where('category', 'mente')->count(), $counts['mente']);
         $this->assertGreaterThan(0, $counts['mente']);
         foreach ($areas as $area) {

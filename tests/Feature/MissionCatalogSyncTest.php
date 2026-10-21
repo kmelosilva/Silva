@@ -20,13 +20,13 @@ class MissionCatalogSyncTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_rf02_carga_do_zero_grava_8_missoes_e_11_coordenadas(): void
+    public function test_rf02_carga_do_zero_grava_9_missoes_e_15_coordenadas(): void
     {
         $this->seed(MissionCatalogSeeder::class);
 
-        $this->assertSame(8, Mission::count());
-        $this->assertSame(11, Coordinate::count());
-        $this->assertSame(11, Coordinate::published()->count());
+        $this->assertSame(9, Mission::count());
+        $this->assertSame(15, Coordinate::count());
+        $this->assertSame(15, Coordinate::published()->count());
 
         $entry = Mission::where('slug', 'seja-um-agente')->firstOrFail();
         $this->assertTrue($entry->is_entry);
@@ -95,20 +95,22 @@ class MissionCatalogSyncTest extends TestCase
         $sync = app(MissionCatalogSync::class);
         $sync->sync($catalog);
 
+        // "Mente sã" sem a terceira coordenada.
         $withoutOne = $catalog;
-        $withoutOne[2]['coordinates'] = array_slice($withoutOne[2]['coordinates'], 0, 2);
+        $index = array_search('corpo-sao-mente-sa', array_column($catalog, 'slug'), true);
+        $withoutOne[$index]['coordinates'] = array_slice($withoutOne[$index]['coordinates'], 0, 2);
         $result = $sync->sync($withoutOne);
 
         $coordinate = Coordinate::where('slug', 'escreva-quem-voce-e-hoje')->firstOrFail();
         $this->assertSame(1, $result['retired_coordinates']);
         $this->assertNotNull($coordinate->retired_at);
-        $this->assertSame(10, Coordinate::published()->count());
-        $this->assertSame(11, Coordinate::count(), 'Aposentar não pode apagar a linha.');
+        $this->assertSame(14, Coordinate::published()->count());
+        $this->assertSame(15, Coordinate::count(), 'Aposentar não pode apagar a linha.');
 
         $sync->sync($catalog);
 
         $this->assertNull($coordinate->fresh()->retired_at);
-        $this->assertSame(11, Coordinate::published()->count());
+        $this->assertSame(15, Coordinate::published()->count());
     }
 
     public function test_rf02_missoes_geradas_sao_aposentadas_sem_ser_apagadas(): void
@@ -117,7 +119,7 @@ class MissionCatalogSyncTest extends TestCase
 
         $this->seed(MissionCatalogSeeder::class);
 
-        $this->assertSame(11, Mission::count());
+        $this->assertSame(12, Mission::count());
         foreach ($generated as $mission) {
             $this->assertNotNull($mission->fresh()->retired_at);
         }
@@ -131,7 +133,7 @@ class MissionCatalogSyncTest extends TestCase
         app(MissionCatalogSync::class)->sync($catalog);
 
         $this->assertTrue(Coordinate::where('slug', 'acorde-meia-hora-antes')->value('physical_effort'));
-        $this->assertSame(1, Coordinate::where('physical_effort', true)->count(), 'Sem a marca, a coordenada fica sem aviso.');
+        $this->assertFalse(Coordinate::where('slug', 'leia-dez-paginas')->value('physical_effort'), 'Sem a marca, a coordenada fica sem aviso.');
     }
 
     public function test_rf02_texto_em_varias_linhas_vira_paragrafo(): void
@@ -188,7 +190,7 @@ class MissionCatalogSyncTest extends TestCase
                 $c[2]['coordinates'][1]['slug'] = $c[2]['coordinates'][0]['slug'];
 
                 return $c;
-            }, 'Slug repetido na missão corpo-sao-mente-sa'],
+            }, 'Slug repetido na missão corpo-sao:'],
             'catálogo vazio' => [fn (array $c) => [], 'está vazio'],
             'termo proibido no título da missão' => [
                 fn (array $c) => self::with($c, 1, 'title', 'Não espere o Sol para queimar energia'),

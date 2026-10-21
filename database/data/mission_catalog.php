@@ -14,7 +14,10 @@
  * - "category" usa as chaves de App\Enums\Category; a missão de entrada não tem.
  * - Coordenada com "content" null fica oculta, e missão sem coordenada com texto também.
  * - Linhas seguidas viram um parágrafo; uma linha em branco separa parágrafos.
- * - Regras de texto: saúde sem peso e gamificação que não pune (README das specs).
+ * - "physical" => true marca a coordenada com esforço físico: a tela mostra o aviso de
+ *   cuidado (App\Models\Coordinate::CARE_NOTICE).
+ * - Regras de texto: saúde sem peso e gamificação que não pune (README das specs). Os termos
+ *   proibidos estão em App\Support\ContentRules, e a carga recusa o texto que usar um deles.
  */
 
 $xp = 20; // igual para todas as coordenadas nesta versão
@@ -69,9 +72,88 @@ return [
             ],
         ],
     ],
+    // Versão inicial de 2026-10-21 (spec conteudo_missoes-de-saude), escrita a partir das
+    // coordenadas de corpo do mockup "Corpo são, mente sã" (Drive, 2023) e da abertura
+    // "Saia do piloto automático", aguardando a reescrita do Kayque. Cada coordenada fecha
+    // com "Dia difícil?", a versão leve. Fontes conferidas no texto original em 2026-10-21:
+    // - Guia Alimentar para a População Brasileira, 2ª ed., Ministério da Saúde, 2014 (passo 5);
+    // - Guia de Atividade Física para a População Brasileira, Ministério da Saúde, 2021.
     [
+        'slug' => 'corpo-sao',
+        'title' => 'Corpo são',
+        'description' => 'Saia do piloto automático: quatro cuidados com o corpo, no seu ritmo e com o que você já tem.',
+        'category' => 'saude',
+        'coordinates' => [
+            [
+                'slug' => 'mexa-o-corpo-do-seu-jeito',
+                'title' => 'Mexa o corpo do seu jeito por 10 minutos',
+                'content' => <<<'TXT'
+                    Comece com uma lista: que esportes e movimentos você curte, ou já curtiu um dia?
+                    Futebol, dança, bicicleta, skate, caminhada, brincar com o cachorro, tudo vale.
+                    Escolha um que dê para fazer hoje, sem gastar nada, e mexa o corpo por 10 minutos,
+                    onde der: na sala, no quintal, no caminho até o ponto de ônibus. Não é treino nem
+                    prova: é lembrar que o corpo gosta de se mexer. O Guia de Atividade Física para a
+                    População Brasileira, do Ministério da Saúde, lembra que fazer qualquer atividade
+                    física, no tempo em que pudermos, é melhor que não fazer nada. Cada minuto conta.
+
+                    Dia difícil? Dois minutos de alongamento sentado, ou uma música dançada no quarto,
+                    já valem.
+                    TXT,
+                'physical' => true,
+                'xp' => $xp,
+            ],
+            [
+                'slug' => 'faca-uma-refeicao-com-calma',
+                'title' => 'Faça uma refeição com calma',
+                'content' => <<<'TXT'
+                    Escolha uma refeição de hoje, qualquer uma, e faça dela um momento só seu. Sente-se,
+                    deixe o celular longe e coma sem pressa, reparando no cheiro, no sabor e na textura
+                    de cada coisa. Se der, divida a mesa com alguém de quem você gosta. Aqui não existe
+                    comida certa ou errada: vale o prato que você já ia comer. O Guia Alimentar para a
+                    População Brasileira, do Ministério da Saúde, tem um passo só sobre isso: comer com
+                    regularidade e atenção, em ambientes apropriados e, sempre que possível, com
+                    companhia. Comer com calma também é um jeito de descansar.
+
+                    Dia difícil? Os primeiros cinco minutos da refeição sem tela já valem.
+                    TXT,
+                'xp' => $xp,
+            ],
+            [
+                'slug' => 'tenha-agua-por-perto',
+                'title' => 'Tenha água por perto o dia todo',
+                'content' => <<<'TXT'
+                    Encha uma garrafa ou um copo grande e deixe à vista: na mesa, na mochila, do lado da
+                    cama. Hoje, toda vez que bater o olho nela, tome uns goles, sem contar copos nem bater
+                    meta. A ideia é criar o costume de lembrar da água antes de a sede apertar,
+                    principalmente nos dias quentes ou quando você se mexer mais. Vale a água que você já
+                    bebe em casa: não precisa comprar nada. No fim do dia, repare em como você se sentiu.
+
+                    Dia difícil? Um copo agora e outro na próxima refeição já são um começo.
+                    TXT,
+                'xp' => $xp,
+            ],
+            [
+                'slug' => 'prepare-uma-noite-de-sono',
+                'title' => 'Prepare uma noite de sono',
+                'content' => <<<'TXT'
+                    Descansar também é missão. Hoje à noite, escolha um horário para deitar e, meia hora
+                    antes, comece a desacelerar: diminua as luzes, deixe o celular longe da cama e troque
+                    a tela por algo calmo, como um banho morno, uma música baixa ou umas páginas de
+                    livro. Se a cabeça estiver cheia, anote num papel o que ficou para amanhã: a lista
+                    dorme no papel, e você dorme mais leve. Amanhã cedo, repare em como acordou.
+
+                    Dia difícil? Deixar o celular fora do alcance da mão na hora de deitar já é uma
+                    vitória.
+                    TXT,
+                'xp' => $xp,
+            ],
+        ],
+    ],
+    [
+        // Até 2026-10-21 se chamava "Corpo são, mente sã". O slug ficou: mudá-lo aposentaria a
+        // missão, e quem já a começou perderia o progresso de vista.
         'slug' => 'corpo-sao-mente-sa',
-        'title' => 'Corpo são, mente sã',
+        'title' => 'Mente sã',
         'description' => 'Três hábitos pequenos para treinar a cabeça: ler, pausar e se conhecer. Nenhum pede mais do que alguns minutos.',
         'category' => 'mente',
         'coordinates' => [

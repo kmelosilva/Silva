@@ -28,13 +28,14 @@ class MissionCatalogApiTest extends TestCase
         $this->getJson('/api/missions')->assertUnauthorized();
     }
 
-    public function test_rf05_lista_as_7_missoes_dos_modulos_na_ordem_do_catalogo(): void
+    public function test_rf05_lista_as_8_missoes_dos_modulos_na_ordem_do_catalogo(): void
     {
         $this->signIn();
 
         $this->assertSame(
             [
                 'nao-espere-o-sol',
+                'corpo-sao',
                 'corpo-sao-mente-sa',
                 'luz-no-fim-do-tunel',
                 'negociando-com-cronos',
@@ -122,7 +123,7 @@ class MissionCatalogApiTest extends TestCase
             $this->assertSame(Category::from($category['key'])->label(), $category['label']);
         }
         $this->assertSame(
-            ['habitos', 'mente', 'carreira', 'financas'],
+            ['habitos', 'saude', 'mente', 'carreira', 'financas'],
             array_values(array_unique(array_column($categories, 'key')))
         );
     }
@@ -142,15 +143,21 @@ class MissionCatalogApiTest extends TestCase
         $this->assertSame(['slug', 'position', 'title', 'content', 'xp', 'care_notice'], array_keys($mission['coordinates'][0]));
     }
 
-    public function test_rf04_aviso_de_cuidado_so_na_coordenada_com_esforco_fisico(): void
+    public function test_rf04_aviso_de_cuidado_so_nas_coordenadas_com_esforco_fisico(): void
     {
         $this->signIn();
         Coordinate::where('slug', 'acorde-meia-hora-antes')->update(['physical_effort' => true]);
 
         $coordinates = collect($this->getJson('/api/missions')->assertOk()->json('data.*.coordinates'))->flatten(1);
+        $withNotice = $coordinates->whereNotNull('care_notice');
 
-        $this->assertSame(Coordinate::CARE_NOTICE, $coordinates->firstWhere('slug', 'acorde-meia-hora-antes')['care_notice']);
-        $this->assertSame(1, $coordinates->whereNotNull('care_notice')->count());
+        $this->assertEqualsCanonicalizing(
+            Coordinate::where('physical_effort', true)->pluck('slug')->all(),
+            $withNotice->pluck('slug')->all()
+        );
+        $this->assertContains('acorde-meia-hora-antes', $withNotice->pluck('slug')->all());
+        $this->assertSame([Coordinate::CARE_NOTICE], $withNotice->pluck('care_notice')->unique()->values()->all());
+        $this->assertGreaterThan($withNotice->count(), $coordinates->count(), 'Coordenada sem esforço fica sem aviso.');
     }
 
     public function test_rnf05_missoes_aceitas_continuam_respondendo_depois_da_carga(): void
