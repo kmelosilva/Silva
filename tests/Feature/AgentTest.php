@@ -112,6 +112,28 @@ class AgentTest extends TestCase
         $this->assertStringNotContainsString('Agente Silva', json_encode($panel));
     }
 
+    public function test_rf03_painel_mostra_o_codinome_e_a_prioridade_depois_do_alistamento(): void
+    {
+        Sanctum::actingAs(User::factory()->create(['name' => 'Kayque Melo']));
+
+        $this->getJson('/api/agent')
+            ->assertOk()
+            ->assertJsonPath('data.codename', null)
+            ->assertJsonPath('data.priorities', [])
+            ->assertJsonPath('data.enlisted', false);
+
+        $this->postJson('/api/enlistment/oath')->assertOk();
+        $this->postJson('/api/enlistment/codename', ['name' => 'Kayque'])->assertOk();
+        $this->postJson('/api/enlistment/complete', ['priorities' => ['carreira']])->assertOk();
+
+        $this->getJson('/api/agent')
+            ->assertOk()
+            ->assertJsonPath('data.name', 'Kayque Melo')
+            ->assertJsonPath('data.codename', 'Kayque da Silva')
+            ->assertJsonPath('data.priorities', [['key' => 'carreira', 'label' => 'Carreira']])
+            ->assertJsonPath('data.enlisted', true);
+    }
+
     public function test_contrato_do_painel_tem_exatamente_os_campos_combinados(): void
     {
         Sanctum::actingAs(User::factory()->create());
@@ -119,7 +141,7 @@ class AgentTest extends TestCase
         $panel = $this->getJson('/api/agent')->assertOk()->json('data');
 
         $this->assertSame(
-            ['name', 'level', 'xp', 'level_xp', 'next_level_xp', 'missions_completed', 'streak'],
+            ['name', 'codename', 'level', 'xp', 'level_xp', 'next_level_xp', 'missions_completed', 'streak', 'priorities', 'enlisted'],
             array_keys($panel)
         );
         $this->assertSame(['current', 'best'], array_keys($panel['streak']));

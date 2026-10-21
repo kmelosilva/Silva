@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Enums\Category;
 use App\Support\LevelCurve;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -20,6 +21,7 @@ class AgentResource extends JsonResource
     {
         return [
             'name' => $this->user->name,
+            'codename' => $this->codename,
             'level' => $this->level,
             'xp' => $this->xp,
             'level_xp' => LevelCurve::xpToReach($this->level),
@@ -29,6 +31,8 @@ class AgentResource extends JsonResource
                 'current' => $this->currentStreak(),
                 'best' => $this->streak_best,
             ],
+            'priorities' => $this->priorityAreas()->map(fn (Category $category) => $category->toArray())->values()->all(),
+            'enlisted' => $this->enlisted_at !== null,
         ];
     }
 }
