@@ -123,6 +123,17 @@ class MissionCatalogSyncTest extends TestCase
         }
     }
 
+    public function test_rf04_carga_grava_a_marca_de_esforco_fisico(): void
+    {
+        $catalog = $this->catalog();
+        $catalog[1]['coordinates'][0]['physical'] = true;
+
+        app(MissionCatalogSync::class)->sync($catalog);
+
+        $this->assertTrue(Coordinate::where('slug', 'acorde-meia-hora-antes')->value('physical_effort'));
+        $this->assertSame(1, Coordinate::where('physical_effort', true)->count(), 'Sem a marca, a coordenada fica sem aviso.');
+    }
+
     public function test_rf02_texto_em_varias_linhas_vira_paragrafo(): void
     {
         $catalog = $this->catalog();
@@ -192,6 +203,11 @@ class MissionCatalogSyncTest extends TestCase
 
                 return $c;
             }, 'A coordenada acorde-meia-hora-antes da missão nao-espere-o-sol usa "dieta"'],
+            'marca de esforço físico que não é booleana' => [function (array $c) {
+                $c[1]['coordinates'][0]['physical'] = 'sim';
+
+                return $c;
+            }, 'A marca de esforço físico precisa ser true ou false'],
             'termo proibido no texto, com maiúscula' => [function (array $c) {
                 $c[1]['coordinates'][0]['content'] = "Acorde cedo.\n\nSem Besteira no café.";
 

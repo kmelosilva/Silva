@@ -139,7 +139,18 @@ class MissionCatalogApiTest extends TestCase
             array_keys($mission)
         );
         $this->assertSame(['key', 'label'], array_keys($mission['category']));
-        $this->assertSame(['slug', 'position', 'title', 'content', 'xp'], array_keys($mission['coordinates'][0]));
+        $this->assertSame(['slug', 'position', 'title', 'content', 'xp', 'care_notice'], array_keys($mission['coordinates'][0]));
+    }
+
+    public function test_rf04_aviso_de_cuidado_so_na_coordenada_com_esforco_fisico(): void
+    {
+        $this->signIn();
+        Coordinate::where('slug', 'acorde-meia-hora-antes')->update(['physical_effort' => true]);
+
+        $coordinates = collect($this->getJson('/api/missions')->assertOk()->json('data.*.coordinates'))->flatten(1);
+
+        $this->assertSame(Coordinate::CARE_NOTICE, $coordinates->firstWhere('slug', 'acorde-meia-hora-antes')['care_notice']);
+        $this->assertSame(1, $coordinates->whereNotNull('care_notice')->count());
     }
 
     public function test_rnf05_missoes_aceitas_continuam_respondendo_depois_da_carga(): void

@@ -57,6 +57,7 @@ class MissionCatalogSync
                             'position' => $position + 1,
                             'title' => $coordinate['title'],
                             'content' => $this->normalize($coordinate['content'] ?? null),
+                            'physical_effort' => $coordinate['physical'] ?? false,
                             'xp' => $coordinate['xp'],
                             'retired_at' => null,
                         ]
@@ -171,6 +172,12 @@ class MissionCatalogSync
                     throw new InvalidArgumentException("Texto inválido na {$whereCoordinate}.");
                 }
                 $this->assertAllowedText($content, $whereCoordinate);
+
+                if (! is_bool($coordinate['physical'] ?? false)) {
+                    throw new InvalidArgumentException(
+                        "A marca de esforço físico precisa ser true ou false na {$whereCoordinate}."
+                    );
+                }
             }
         }
     }
