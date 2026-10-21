@@ -2,9 +2,13 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * Uma missão aceita pelo agente: em andamento sem completed_at, concluída com ele.
+ */
 class UserMission extends Model
 {
     use HasFactory;
@@ -12,10 +16,17 @@ class UserMission extends Model
     protected $fillable = [
         'user_id',
         'mission_id',
-        'completed',
-        'assigned_date',
-        'completed_at'
+        'accepted_at',
+        'completed_at',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'accepted_at' => 'datetime',
+            'completed_at' => 'datetime',
+        ];
+    }
 
     public function mission()
     {
@@ -27,18 +38,11 @@ class UserMission extends Model
         return $this->belongsTo(User::class);
     }
 
-    public static function getTodayMissions($userId)
+    /**
+     * Missões que o agente já concluiu.
+     */
+    public function scopeCompleted(Builder $query): void
     {
-        return self::where('user_id', $userId)
-            ->whereDate('assigned_date', today())
-            ->with('mission')
-            ->get();
-    }
-
-    public static function getAllMissionsByUser($userId)
-    {
-        return self::where('user_id', $userId)
-            ->with('mission')
-            ->get();
+        $query->whereNotNull('completed_at');
     }
 }

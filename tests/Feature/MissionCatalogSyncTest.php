@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Models\Agent;
 use App\Models\Coordinate;
+use App\Models\CoordinateCompletion;
 use App\Models\Mission;
 use App\Models\User;
 use App\Models\UserMission;
@@ -48,20 +48,27 @@ class MissionCatalogSyncTest extends TestCase
     {
         $this->seed(MissionCatalogSeeder::class);
         $user = User::factory()->create();
-        Agent::create(['user_id' => $user->id, 'level' => 3, 'xp' => 120]);
+        $user->agent->update(['level' => 3, 'xp' => 120, 'streak_current' => 2, 'streak_best' => 5]);
+        $mission = Mission::where('slug', 'negociando-com-cronos')->firstOrFail();
         UserMission::create([
             'user_id' => $user->id,
-            'mission_id' => Mission::where('slug', 'negociando-com-cronos')->value('id'),
-            'completed' => true,
-            'assigned_date' => '2026-10-18',
+            'mission_id' => $mission->id,
+            'accepted_at' => '2026-10-18 09:00:00',
             'completed_at' => '2026-10-18 10:00:00',
         ]);
-        $before = [DB::table('agents')->get()->toArray(), DB::table('user_missions')->get()->toArray()];
+        CoordinateCompletion::create([
+            'user_id' => $user->id,
+            'coordinate_id' => $mission->coordinates()->value('id'),
+            'xp' => 20,
+            'completed_at' => '2026-10-18 10:00:00',
+        ]);
+        $before = $this->progressSnapshot();
+        $this->assertGreaterThan(0, count($before['coordinate_completions']));
 
         $this->travel(5)->minutes();
         $this->seed(MissionCatalogSeeder::class);
 
-        $this->assertEquals($before, [DB::table('agents')->get()->toArray(), DB::table('user_missions')->get()->toArray()]);
+        $this->assertEquals($before, $this->progressSnapshot());
     }
 
     public function test_rf04_coordenada_fora_do_catalogo_e_aposentada_e_volta_quando_reaparece(): void
@@ -177,5 +184,15 @@ class MissionCatalogSyncTest extends TestCase
             Mission::max('updated_at'),
             Coordinate::max('updated_at'),
         ];
+    }
+
+    /**
+     * @return array<string, array<int, mixed>>
+     */
+    private function progressSnapshot(): array
+    {
+        return collect(['agents', 'user_missions', 'coordinate_completions'])
+            ->mapWithKeys(fn (string $table) => [$table => DB::table($table)->get()->toArray()])
+            ->all();
     }
 }

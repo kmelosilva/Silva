@@ -1,0 +1,344 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Coordinate;
+use App\Models\CoordinateCompletion;
+use App\Models\Mission;
+use App\Models\User;
+use App\Models\UserMission;
+use Database\Seeders\MissionCatalogSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
+use Laravel\Sanctum\Sanctum;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\TestCase;
+
+class MissionProgressTest extends TestCase
+{
+    use RefreshDatabase;
+
+    // "Corpo são, mente sã": a missão do catálogo com 3 coordenadas.
+    private const MISSION = 'corpo-sao-mente-sa';
+
+    private const FIRST = 'leia-dez-paginas';
+
+    private const SECOND = 'pausa-de-cinco-minutos';
+
+    private const THIRD = 'escreva-quem-voce-e-hoje';
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(MissionCatalogSeeder::class);
+    }
+
+    public function test_rf03_aceitar_registra_em_andamento_e_mostra_a_primeira_coordenada(): void
+    {
+        $user = $this->signIn();
+
+        $this->accept(self::MISSION)
+            ->assertCreated()
+            ->assertJsonPath('data.mission_slug', self::MISSION)
+            ->assertJsonPath('data.status', 'in_progress')
+            ->assertJsonPath('data.completed_coordinates', [])
+            ->assertJsonPath('data.next_coordinate', self::FIRST)
+            ->assertJsonPath('data.completed_at', null);
+
+        $this->assertNotNull(UserMission::where('user_id', $user->id)->sole()->accepted_at);
+    }
+
+    public function test_rf03_aceitar_de_novo_diz_que_ja_esta_em_andamento_e_nao_cria_outro_registro(): void
+    {
+        $this->signIn();
+        $this->accept(self::MISSION)->assertCreated();
+
+        $this->accept(self::MISSION)
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'mission_already_accepted')
+            ->assertJsonPath('error.message', 'Esta missão já está em andamento.');
+
+        $this->assertSame(1, UserMission::count());
+    }
+
+    public function test_rf03_aceitar_missao_concluida_diz_que_ja_foi_concluida(): void
+    {
+        $this->signIn();
+        $this->accept('nao-espere-o-sol');
+        $this->complete('nao-espere-o-sol', 'acorde-meia-hora-antes')->assertOk();
+
+        $this->accept('nao-espere-o-sol')
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'mission_already_completed')
+            ->assertJsonPath('error.message', 'Você já concluiu esta missão.');
+
+        $this->assertSame(1, UserMission::count());
+    }
+
+    #[DataProvider('missionsOutsideTheModules')]
+    public function test_rf03_missao_fora_dos_modulos_nao_pode_ser_aceita(string $slug): void
+    {
+        $retired = Mission::factory()->create(['slug' => 'aposentada', 'retired_at' => now()]);
+        Coordinate::factory()->create(['mission_id' => $retired->id]);
+        $this->signIn();
+
+        $this->accept($slug)->assertNotFound()->assertJsonPath('message', 'Missão não encontrada.');
+
+        $this->assertSame(0, UserMission::count());
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function missionsOutsideTheModules(): array
+    {
+        return [
+            'de entrada' => ['seja-um-agente'],
+            'aposentada' => ['aposentada'],
+            'inexistente' => ['nao-existe'],
+        ];
+    }
+
+    public function test_rf04_cumprir_a_proxima_soma_o_xp_e_mostra_a_seguinte(): void
+    {
+        $user = $this->signIn();
+        $this->accept(self::MISSION);
+
+        $this->complete(self::MISSION, self::FIRST)
+            ->assertOk()
+            ->assertJsonPath('data.result.xp_gained', 20)
+            ->assertJsonPath('data.result.already_completed', false)
+            ->assertJsonPath('data.progress.completed_coordinates', [self::FIRST])
+            ->assertJsonPath('data.progress.next_coordinate', self::SECOND)
+            ->assertJsonPath('data.agent.xp', 20);
+
+        $this->assertSame(20, $user->agent->fresh()->xp);
+    }
+
+    public function test_rf04_fora_de_ordem_e_recusado_e_diz_qual_e_a_proxima(): void
+    {
+        $user = $this->signIn();
+        $this->accept(self::MISSION);
+
+        $this->complete(self::MISSION, self::THIRD)
+            ->assertUnprocessable()
+            ->assertJsonPath('error.code', 'coordinate_out_of_order')
+            ->assertJsonPath('error.message', 'Cumpra antes a coordenada 1: Leia dez páginas de um livro.')
+            ->assertJsonPath('error.next_coordinate', self::FIRST);
+
+        $this->complete(self::MISSION, self::FIRST)->assertOk();
+
+        $this->complete(self::MISSION, self::THIRD)
+            ->assertUnprocessable()
+            ->assertJsonPath('error.next_coordinate', self::SECOND);
+
+        $this->assertSame(20, $user->agent->fresh()->xp);
+        $this->assertSame(1, CoordinateCompletion::count());
+    }
+
+    public function test_rf04_sem_aceitar_e_recusado_e_oferece_aceitar(): void
+    {
+        $user = $this->signIn();
+
+        $this->complete(self::MISSION, self::FIRST)
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'mission_not_accepted')
+            ->assertJsonPath('error.message', 'Aceite a missão para começar a cumprir as coordenadas.');
+
+        $this->assertSame(0, $user->agent->fresh()->xp);
+        $this->assertSame(0, CoordinateCompletion::count());
+    }
+
+    public function test_rf04_coordenada_de_outra_missao_ou_sem_texto_da_404(): void
+    {
+        $this->signIn();
+        $this->accept(self::MISSION);
+
+        $this->complete(self::MISSION, 'acorde-meia-hora-antes')
+            ->assertNotFound()
+            ->assertJsonPath('message', 'Coordenada não encontrada.');
+        $this->complete('seja-um-agente', 'siga-o-codigo-de-etica')->assertNotFound();
+
+        $this->assertSame(0, CoordinateCompletion::count());
+    }
+
+    public function test_rnf01_envio_duplicado_soma_o_xp_uma_unica_vez(): void
+    {
+        $user = $this->signIn();
+        $this->accept(self::MISSION);
+
+        $this->complete(self::MISSION, self::FIRST)->assertOk()->assertJsonPath('data.result.xp_gained', 20);
+
+        $this->complete(self::MISSION, self::FIRST)
+            ->assertOk()
+            ->assertJsonPath('data.result.xp_gained', 0)
+            ->assertJsonPath('data.result.already_completed', true)
+            ->assertJsonPath('data.progress.next_coordinate', self::SECOND)
+            ->assertJsonPath('data.agent.xp', 20);
+
+        // Somou, e somou uma vez: nem 0 nem 40.
+        $this->assertSame(20, $user->agent->fresh()->xp);
+        $this->assertSame(1, CoordinateCompletion::count());
+    }
+
+    public function test_rf05_ultima_coordenada_conclui_a_missao_e_conta_no_painel(): void
+    {
+        $this->signIn();
+        $this->accept(self::MISSION);
+
+        $this->complete(self::MISSION, self::FIRST)->assertJsonPath('data.result.mission_completed', false);
+        $this->complete(self::MISSION, self::SECOND)->assertJsonPath('data.result.mission_completed', false);
+
+        $this->complete(self::MISSION, self::THIRD)
+            ->assertOk()
+            ->assertJsonPath('data.result.mission_completed', true)
+            ->assertJsonPath('data.progress.status', 'completed')
+            ->assertJsonPath('data.progress.next_coordinate', null)
+            ->assertJsonPath('data.progress.completed_coordinates', [self::FIRST, self::SECOND, self::THIRD])
+            ->assertJsonPath('data.agent.missions_completed', 1);
+
+        $this->getJson('/api/agent')->assertJsonPath('data.missions_completed', 1);
+        $this->assertNotNull(UserMission::sole()->completed_at);
+    }
+
+    public function test_rf06_sobe_de_nivel_quando_o_xp_alcanca_a_curva(): void
+    {
+        $user = $this->signIn();
+        $user->agent->update(['xp' => 40]);
+        $this->accept('nao-espere-o-sol');
+
+        $this->complete('nao-espere-o-sol', 'acorde-meia-hora-antes')
+            ->assertJsonPath('data.result.levels_gained', 1)
+            ->assertJsonPath('data.agent.level', 2)
+            ->assertJsonPath('data.agent.xp', 60)
+            ->assertJsonPath('data.agent.level_xp', 50)
+            ->assertJsonPath('data.agent.next_level_xp', 150);
+    }
+
+    public function test_rf06_um_ganho_grande_sobe_varios_niveis_de_uma_vez(): void
+    {
+        $big = Mission::factory()->create(['slug' => 'grande']);
+        Coordinate::factory()->create(['mission_id' => $big->id, 'slug' => 'unica', 'xp' => 300]);
+        $user = $this->signIn();
+        $this->accept('grande');
+
+        $this->complete('grande', 'unica')
+            ->assertJsonPath('data.result.levels_gained', 3)
+            ->assertJsonPath('data.agent.level', 4);
+
+        $this->assertSame(4, $user->agent->fresh()->level);
+    }
+
+    public function test_rf06_nivel_e_xp_nunca_descem(): void
+    {
+        // Como se a curva tivesse mudado: nível guardado acima do que a curva daria.
+        $user = $this->signIn();
+        $user->agent->update(['level' => 5, 'xp' => 0]);
+        $this->accept('nao-espere-o-sol');
+
+        $this->complete('nao-espere-o-sol', 'acorde-meia-hora-antes')
+            ->assertJsonPath('data.result.levels_gained', 0)
+            ->assertJsonPath('data.agent.level', 5)
+            ->assertJsonPath('data.agent.xp', 20);
+    }
+
+    public function test_d02_xp_do_agente_e_a_soma_das_coordenadas_cumpridas(): void
+    {
+        $user = $this->signIn();
+        $this->accept(self::MISSION);
+        $this->accept('negociando-com-cronos');
+
+        $this->complete(self::MISSION, self::FIRST);
+        $this->complete('negociando-com-cronos', 'escolha-tres-prioridades');
+        $this->complete(self::MISSION, self::SECOND);
+        $this->complete(self::MISSION, self::SECOND);
+
+        $this->assertSame(60, $user->agent->fresh()->xp);
+        $this->assertSame(60, (int) CoordinateCompletion::where('user_id', $user->id)->sum('xp'));
+    }
+
+    public function test_d02_mudar_o_xp_no_catalogo_nao_mexe_no_que_ja_foi_ganho(): void
+    {
+        $user = $this->signIn();
+        $this->accept(self::MISSION);
+        $this->complete(self::MISSION, self::FIRST);
+
+        Coordinate::where('slug', self::FIRST)->update(['xp' => 5]);
+
+        $this->getJson('/api/agent')->assertJsonPath('data.xp', 20);
+        $this->assertSame(20, CoordinateCompletion::sole()->xp);
+        $this->assertSame(20, $user->agent->fresh()->xp);
+    }
+
+    public function test_rnf02_um_agente_nao_ve_nem_altera_o_progresso_de_outro(): void
+    {
+        $ana = $this->signIn();
+        $this->accept(self::MISSION);
+        $this->complete(self::MISSION, self::FIRST);
+
+        $bia = $this->signIn();
+
+        $this->getJson('/api/missions/my')->assertOk()->assertJsonCount(0, 'data');
+        $this->getJson('/api/agent')->assertJsonPath('data.xp', 0);
+        $this->complete(self::MISSION, self::SECOND)->assertStatus(409);
+        $this->accept(self::MISSION)->assertCreated()->assertJsonPath('data.next_coordinate', self::FIRST);
+
+        $this->assertSame(20, $ana->agent->fresh()->xp);
+        $this->assertSame(0, $bia->agent->fresh()->xp);
+        $this->assertSame(1, CoordinateCompletion::count());
+    }
+
+    public function test_missoes_aceitas_vem_na_ordem_de_aceite_com_o_progresso_de_cada_uma(): void
+    {
+        $this->signIn();
+        $this->accept('negociando-com-cronos');
+        $this->travel(1)->minutes();
+        $this->accept(self::MISSION);
+        $this->complete(self::MISSION, self::FIRST);
+
+        $this->getJson('/api/missions/my')
+            ->assertOk()
+            ->assertJsonPath('data.0.mission_slug', 'negociando-com-cronos')
+            ->assertJsonPath('data.0.completed_coordinates', [])
+            ->assertJsonPath('data.1.mission_slug', self::MISSION)
+            ->assertJsonPath('data.1.completed_coordinates', [self::FIRST])
+            ->assertJsonPath('data.1.next_coordinate', self::SECOND);
+    }
+
+    public function test_contrato_do_progresso_tem_exatamente_os_campos_combinados(): void
+    {
+        $this->signIn();
+        $progressFields = ['mission_slug', 'status', 'completed_coordinates', 'next_coordinate', 'accepted_at', 'completed_at'];
+
+        $this->assertSame($progressFields, array_keys($this->accept(self::MISSION)->json('data')));
+        $this->assertSame($progressFields, array_keys($this->getJson('/api/missions/my')->json('data.0')));
+
+        $completion = $this->complete(self::MISSION, self::FIRST)->json('data');
+
+        $this->assertSame(['progress', 'agent', 'result'], array_keys($completion));
+        $this->assertSame($progressFields, array_keys($completion['progress']));
+        $this->assertSame(
+            ['xp_gained', 'levels_gained', 'mission_completed', 'already_completed'],
+            array_keys($completion['result'])
+        );
+    }
+
+    private function signIn(): User
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+
+        return $user;
+    }
+
+    private function accept(string $mission): TestResponse
+    {
+        return $this->postJson("/api/missions/{$mission}/accept");
+    }
+
+    private function complete(string $mission, string $coordinate): TestResponse
+    {
+        return $this->postJson("/api/missions/{$mission}/coordinates/{$coordinate}/complete");
+    }
+}

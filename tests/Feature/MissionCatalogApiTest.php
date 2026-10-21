@@ -142,11 +142,11 @@ class MissionCatalogApiTest extends TestCase
         $this->assertSame(['slug', 'position', 'title', 'content', 'xp'], array_keys($mission['coordinates'][0]));
     }
 
-    public function test_rnf05_missoes_atribuidas_continuam_respondendo(): void
+    public function test_rnf05_missoes_aceitas_continuam_respondendo_depois_da_carga(): void
     {
         $user = $this->signIn();
-        $generated = Mission::factory()->generated()->create(['category' => null]);
-        UserMission::create(['user_id' => $user->id, 'mission_id' => $generated->id, 'assigned_date' => today()]);
+        $mission = Mission::where('slug', 'nao-espere-o-sol')->firstOrFail();
+        UserMission::create(['user_id' => $user->id, 'mission_id' => $mission->id, 'accepted_at' => now()]);
         $this->seed(MissionCatalogSeeder::class);
 
         $this->getJson('/api/missions/my')->assertOk()->assertJsonCount(1, 'data');

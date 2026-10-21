@@ -63,4 +63,20 @@ class Mission extends Model
             ->whereNotNull('category')
             ->whereHas('coordinates', fn (Builder $coordinates) => $coordinates->published());
     }
+
+    /**
+     * Missões que a sugestão do dia pode oferecer a um agente desse nível, nesse dia: sem regra,
+     * ou com pelo menos uma regra diária, aleatória ou de desbloqueio por nível que o nível e a
+     * data permitem. Semanais e de evento ficam para a spec do tema semanal; `chance` não é usado.
+     */
+    public function scopeSuggestableFor(Builder $query, int $level, string $day): void
+    {
+        $query->where(fn (Builder $missions) => $missions
+            ->whereDoesntHave('rules')
+            ->orWhereHas('rules', fn (Builder $rules) => $rules
+                ->whereIn('type', ['daily', 'random', 'level_unlock'])
+                ->where('min_level', '<=', $level)
+                ->where(fn (Builder $dates) => $dates->whereNull('start_date')->orWhere('start_date', '<=', $day))
+                ->where(fn (Builder $dates) => $dates->whereNull('end_date')->orWhere('end_date', '>=', $day))));
+    }
 }
