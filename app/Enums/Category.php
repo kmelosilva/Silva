@@ -26,4 +26,14 @@ enum Category: string
             self::Habitos => 'Hábitos',
         };
     }
+
+    /**
+     * Como a categoria sai na API: {key, label}.
+     *
+     * @return array{key: string, label: string}
+     */
+    public function toArray(): array
+    {
+        return ['key' => $this->value, 'label' => $this->label()];
+    }
 }

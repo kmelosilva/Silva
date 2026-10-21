@@ -138,6 +138,7 @@ class AgentTest extends TestCase
         return [
             'painel' => ['GET', '/api/agent'],
             'missões aceitas' => ['GET', '/api/missions/my'],
+            'sugestão do dia' => ['GET', '/api/missions/today'],
             'aceitar' => ['POST', '/api/missions/corpo-sao-mente-sa/accept'],
             'cumprir' => ['POST', '/api/missions/corpo-sao-mente-sa/coordinates/leia-dez-paginas/complete'],
         ];
