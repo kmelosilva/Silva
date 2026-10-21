@@ -11,12 +11,18 @@ class Coordinate extends Model
 {
     use HasFactory;
 
+    /**
+     * O aviso de cuidado das coordenadas com esforço físico: curto, sem alarme, sem esconder o texto.
+     */
+    public const CARE_NOTICE = 'Vá no seu ritmo e respeite os limites do seu corpo. Se você tem alguma condição de saúde, ou se algo doer, procure a orientação de um profissional.';
+
     protected $fillable = [
         'mission_id',
         'slug',
         'position',
         'title',
         'content',
+        'physical_effort',
         'xp',
         'retired_at',
     ];
@@ -26,6 +32,7 @@ class Coordinate extends Model
         return [
             'position' => 'integer',
             'xp' => 'integer',
+            'physical_effort' => 'boolean',
             'retired_at' => 'datetime',
         ];
     }

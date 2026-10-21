@@ -2,9 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Models\Coordinate;
 use App\Models\Mission;
 use App\Models\MissionRule;
 use App\Models\User;
+use App\Support\LevelCurve;
 use Carbon\CarbonImmutable;
 use Database\Seeders\MissionCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -154,7 +156,12 @@ class DailySuggestionTest extends TestCase
             ->assertJsonPath('data.type', 'none')
             ->assertJsonPath('data.mission', null)
             ->assertJsonPath('data.coordinate', null);
-        $this->getJson('/api/agent')->assertJsonPath('data.xp', 200)->assertJsonPath('data.level', 3);
+        // Prova que cumpriu mesmo tudo: o XP é a soma de todas as coordenadas dos módulos.
+        $total = Coordinate::published()->whereHas('mission', fn ($missions) => $missions->inModules())->sum('xp');
+        $this->assertGreaterThan(0, $total);
+        $this->getJson('/api/agent')
+            ->assertJsonPath('data.xp', (int) $total)
+            ->assertJsonPath('data.level', LevelCurve::levelFor((int) $total));
     }
 
     public function test_rf05_missao_de_entrada_em_andamento_vem_antes_das_outras(): void
@@ -198,27 +205,28 @@ class DailySuggestionTest extends TestCase
 
     public function test_rf05_prioridade_sem_missao_sugere_outra_area_e_diz_qual_faltou(): void
     {
-        $this->enlist(['saude']);
+        // Social é a área que ainda não tem missão.
+        $this->enlist(['social']);
         $this->complete('seja-um-agente', 'siga-o-codigo-de-etica');
 
         $suggestion = $this->getJson('/api/missions/today')
             ->assertOk()
             ->assertJsonPath('data.type', 'suggested_mission')
-            ->assertJsonPath('data.unavailable_priorities', [['key' => 'saude', 'label' => 'Saúde']])
+            ->assertJsonPath('data.unavailable_priorities', [['key' => 'social', 'label' => 'Social']])
             ->json('data');
 
         $this->assertNotNull($suggestion['mission']);
-        $this->assertNotSame('saude', $suggestion['mission']['category']['key']);
+        $this->assertNotSame('social', $suggestion['mission']['category']['key']);
     }
 
     public function test_rf05_uma_prioridade_vazia_e_outra_com_missao(): void
     {
-        $this->enlist(['saude', 'carreira']);
+        $this->enlist(['social', 'carreira']);
         $this->complete('seja-um-agente', 'siga-o-codigo-de-etica');
 
         $this->getJson('/api/missions/today')
             ->assertJsonPath('data.mission.slug', 'negociando-com-cronos')
-            ->assertJsonPath('data.unavailable_priorities', [['key' => 'saude', 'label' => 'Saúde']]);
+            ->assertJsonPath('data.unavailable_priorities', [['key' => 'social', 'label' => 'Social']]);
     }
 
     public function test_contrato_da_sugestao_tem_exatamente_os_campos_combinados(): void

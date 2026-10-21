@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\Category;
 use App\Models\Coordinate;
 use App\Models\Mission;
+use App\Support\ContentRules;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -56,6 +57,7 @@ class MissionCatalogSync
                             'position' => $position + 1,
                             'title' => $coordinate['title'],
                             'content' => $this->normalize($coordinate['content'] ?? null),
+                            'physical_effort' => $coordinate['physical'] ?? false,
                             'xp' => $coordinate['xp'],
                             'retired_at' => null,
                         ]
@@ -124,6 +126,8 @@ class MissionCatalogSync
             $missionSlugs[] = $item['slug'];
 
             $this->assertTitle($item['title'] ?? null, $where);
+            $this->assertAllowedText($item['title'], $where);
+            $this->assertAllowedText($item['description'] ?? null, $where);
 
             $isEntry = $item['is_entry'] ?? false;
             $category = $item['category'] ?? null;
@@ -154,6 +158,7 @@ class MissionCatalogSync
                 $coordinateSlugs[] = $slug;
 
                 $this->assertTitle($coordinate['title'] ?? null, $whereCoordinate);
+                $this->assertAllowedText($coordinate['title'], $whereCoordinate);
 
                 $xp = $coordinate['xp'] ?? null;
                 if (! is_int($xp) || $xp < 1) {
@@ -166,6 +171,13 @@ class MissionCatalogSync
                 if ($content !== null && ! is_string($content)) {
                     throw new InvalidArgumentException("Texto inválido na {$whereCoordinate}.");
                 }
+                $this->assertAllowedText($content, $whereCoordinate);
+
+                if (! is_bool($coordinate['physical'] ?? false)) {
+                    throw new InvalidArgumentException(
+                        "A marca de esforço físico precisa ser true ou false na {$whereCoordinate}."
+                    );
+                }
             }
         }
     }
@@ -174,6 +186,23 @@ class MissionCatalogSync
     {
         if (! is_string($slug) || strlen($slug) > self::SLUG_MAX_LENGTH || preg_match(self::SLUG_PATTERN, $slug) !== 1) {
             throw new InvalidArgumentException("Slug inválido na {$where}: ".var_export($slug, true).'.');
+        }
+    }
+
+    /**
+     * A regra "saúde sem peso" vale para todo texto que o agente lê (App\Support\ContentRules).
+     */
+    private function assertAllowedText(mixed $text, string $where): void
+    {
+        if (! is_string($text)) {
+            return;
+        }
+
+        $terms = ContentRules::forbiddenTermsIn($text);
+        if ($terms !== []) {
+            throw new InvalidArgumentException(
+                'A '.$where.' usa "'.implode('", "', $terms).'", que a regra "saúde sem peso" não permite.'
+            );
         }
     }
 
