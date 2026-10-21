@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Enums\Category;
 use App\Services\Suggestion;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -34,6 +35,10 @@ class DailySuggestionResource extends JsonResource
                 'position' => $coordinate->position,
                 'title' => $coordinate->title,
             ] : null,
+            'unavailable_priorities' => array_map(
+                fn (Category $area) => $area->toArray(),
+                $suggestion->unavailablePriorities,
+            ),
         ];
     }
 }

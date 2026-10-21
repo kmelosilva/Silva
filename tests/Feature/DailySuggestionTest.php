@@ -157,17 +157,91 @@ class DailySuggestionTest extends TestCase
         $this->getJson('/api/agent')->assertJsonPath('data.xp', 200)->assertJsonPath('data.level', 3);
     }
 
+    public function test_rf05_missao_de_entrada_em_andamento_vem_antes_das_outras(): void
+    {
+        $this->accept('corpo-sao-mente-sa');
+        $this->travel(1)->minutes();
+        $this->enlist(['mente']);
+
+        $this->getJson('/api/missions/today')
+            ->assertOk()
+            ->assertJsonPath('data.type', 'next_coordinate')
+            ->assertJsonPath('data.mission.slug', 'seja-um-agente')
+            ->assertJsonPath('data.mission.category', null)
+            ->assertJsonPath('data.coordinate.slug', 'siga-o-codigo-de-etica')
+            ->assertJsonPath('data.unavailable_priorities', []);
+    }
+
+    public function test_rf05_depois_da_entrada_sugere_uma_missao_da_prioridade(): void
+    {
+        $this->enlist(['financas']);
+        $this->complete('seja-um-agente', 'siga-o-codigo-de-etica');
+
+        $this->getJson('/api/missions/today')
+            ->assertOk()
+            ->assertJsonPath('data.type', 'suggested_mission')
+            ->assertJsonPath('data.mission.slug', 'gerindo-recursos')
+            ->assertJsonPath('data.unavailable_priorities', []);
+    }
+
+    public function test_rf05_a_sugestao_pela_prioridade_vale_todo_dia_e_para_as_duas_areas(): void
+    {
+        $this->enlist(['carreira', 'financas']);
+        $this->complete('seja-um-agente', 'siga-o-codigo-de-etica');
+
+        foreach (range(0, 9) as $day) {
+            $this->travelTo(CarbonImmutable::parse('2026-11-01 12:00')->addDays($day));
+            $category = $this->getJson('/api/missions/today')->json('data.mission.category.key');
+            $this->assertContains($category, ['carreira', 'financas'], "No dia {$day}, a sugestão saiu da prioridade.");
+        }
+    }
+
+    public function test_rf05_prioridade_sem_missao_sugere_outra_area_e_diz_qual_faltou(): void
+    {
+        $this->enlist(['saude']);
+        $this->complete('seja-um-agente', 'siga-o-codigo-de-etica');
+
+        $suggestion = $this->getJson('/api/missions/today')
+            ->assertOk()
+            ->assertJsonPath('data.type', 'suggested_mission')
+            ->assertJsonPath('data.unavailable_priorities', [['key' => 'saude', 'label' => 'Saúde']])
+            ->json('data');
+
+        $this->assertNotNull($suggestion['mission']);
+        $this->assertNotSame('saude', $suggestion['mission']['category']['key']);
+    }
+
+    public function test_rf05_uma_prioridade_vazia_e_outra_com_missao(): void
+    {
+        $this->enlist(['saude', 'carreira']);
+        $this->complete('seja-um-agente', 'siga-o-codigo-de-etica');
+
+        $this->getJson('/api/missions/today')
+            ->assertJsonPath('data.mission.slug', 'negociando-com-cronos')
+            ->assertJsonPath('data.unavailable_priorities', [['key' => 'saude', 'label' => 'Saúde']]);
+    }
+
     public function test_contrato_da_sugestao_tem_exatamente_os_campos_combinados(): void
     {
         $suggested = $this->getJson('/api/missions/today')->json('data');
 
-        $this->assertSame(['type', 'mission', 'coordinate'], array_keys($suggested));
+        $this->assertSame(['type', 'mission', 'coordinate', 'unavailable_priorities'], array_keys($suggested));
         $this->assertSame(['slug', 'title', 'category'], array_keys($suggested['mission']));
 
         $this->accept('corpo-sao-mente-sa');
         $next = $this->getJson('/api/missions/today')->json('data');
 
         $this->assertSame(['slug', 'position', 'title'], array_keys($next['coordinate']));
+    }
+
+    /**
+     * @param  list<string>  $priorities
+     */
+    private function enlist(array $priorities): void
+    {
+        $this->postJson('/api/enlistment/oath')->assertOk();
+        $this->postJson('/api/enlistment/codename', ['name' => 'Ana'])->assertOk();
+        $this->postJson('/api/enlistment/complete', ['priorities' => $priorities])->assertOk();
     }
 
     private function accept(string $mission): void

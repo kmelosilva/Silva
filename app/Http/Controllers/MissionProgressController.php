@@ -32,7 +32,7 @@ class MissionProgressController extends Controller
 
     public function complete(Request $request, string $mission, string $coordinate): CompletionResource
     {
-        $mission = $this->findMission($mission);
+        $mission = $this->findMission($mission, withEntry: true);
 
         return new CompletionResource(
             $this->progress->complete($request->user(), $mission, $this->findCoordinate($mission, $coordinate))
@@ -40,11 +40,13 @@ class MissionProgressController extends Controller
     }
 
     /**
-     * Só as missões dos módulos: aposentada, de entrada ou inexistente dá 404.
+     * Aceitar procura só nas missões dos módulos: a de entrada chega pelo alistamento.
+     * Cumprir procura também na de entrada. Aposentada ou inexistente dá 404.
      */
-    private function findMission(string $slug): Mission
+    private function findMission(string $slug, bool $withEntry = false): Mission
     {
-        $mission = Mission::query()->inModules()->where('slug', $slug)->first();
+        $missions = $withEntry ? Mission::query()->playable() : Mission::query()->inModules();
+        $mission = $missions->where('slug', $slug)->first();
 
         abort_if(! $mission, 404, 'Missão não encontrada.');
 

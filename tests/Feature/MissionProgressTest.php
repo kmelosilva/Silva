@@ -154,13 +154,57 @@ class MissionProgressTest extends TestCase
     {
         $this->signIn();
         $this->accept(self::MISSION);
+        Coordinate::where('slug', self::THIRD)->update(['content' => null]);
 
         $this->complete(self::MISSION, 'acorde-meia-hora-antes')
             ->assertNotFound()
             ->assertJsonPath('message', 'Coordenada não encontrada.');
-        $this->complete('seja-um-agente', 'siga-o-codigo-de-etica')->assertNotFound();
+        $this->complete(self::MISSION, self::THIRD)->assertNotFound();
 
         $this->assertSame(0, CoordinateCompletion::count());
+    }
+
+    public function test_rf05_missao_de_entrada_e_cumprida_depois_do_alistamento(): void
+    {
+        $this->signIn();
+        $this->postJson('/api/enlistment/oath')->assertOk();
+        $this->postJson('/api/enlistment/codename', ['name' => 'Ana'])->assertOk();
+        $this->postJson('/api/enlistment/complete', ['priorities' => []])->assertOk();
+
+        $this->complete('seja-um-agente', 'siga-o-codigo-de-etica')
+            ->assertOk()
+            ->assertJsonPath('data.result.xp_gained', 20)
+            ->assertJsonPath('data.result.mission_completed', true)
+            ->assertJsonPath('data.progress.status', 'completed')
+            ->assertJsonPath('data.agent.missions_completed', 1);
+    }
+
+    public function test_rf05_cumprir_a_entrada_sem_o_alistamento_pede_para_aceitar(): void
+    {
+        $this->signIn();
+
+        $this->complete('seja-um-agente', 'siga-o-codigo-de-etica')
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'mission_not_accepted');
+
+        $this->assertSame(0, CoordinateCompletion::count());
+    }
+
+    public function test_rf05_a_tela_busca_a_missao_de_entrada_fora_dos_modulos(): void
+    {
+        $this->signIn();
+
+        $this->getJson('/api/missions/entry')
+            ->assertOk()
+            ->assertJsonPath('data.slug', 'seja-um-agente')
+            ->assertJsonPath('data.category', null)
+            ->assertJsonPath('data.coordinates_count', 1)
+            ->assertJsonPath('data.coordinates.0.slug', 'siga-o-codigo-de-etica');
+        $this->assertSame(1, Mission::entry()->count());
+
+        Coordinate::where('slug', 'siga-o-codigo-de-etica')->update(['content' => null]);
+
+        $this->getJson('/api/missions/entry')->assertNotFound()->assertJsonPath('message', 'Missão não encontrada.');
     }
 
     public function test_rnf01_envio_duplicado_soma_o_xp_uma_unica_vez(): void

@@ -26,6 +26,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/priority-areas', [PriorityAreaController::class, 'index']);
 
     Route::get('/missions', [MissionController::class, 'index']);
+    Route::get('/missions/entry', [MissionController::class, 'entry']);
     Route::get('/missions/today', [DailySuggestionController::class, 'show']);
     Route::get('/missions/my', [MissionProgressController::class, 'index']);
     Route::post('/missions/{mission}/accept', [MissionProgressController::class, 'accept']);

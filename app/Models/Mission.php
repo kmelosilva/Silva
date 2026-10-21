@@ -76,6 +76,16 @@ class Mission extends Model
     }
 
     /**
+     * Missões que o agente pode cumprir: as dos módulos e a de entrada.
+     */
+    public function scopePlayable(Builder $query): void
+    {
+        $query->where(fn (Builder $missions) => $missions
+            ->where(fn (Builder $modules) => $modules->inModules())
+            ->orWhere(fn (Builder $entry) => $entry->entry()));
+    }
+
+    /**
      * Missões que a sugestão do dia pode oferecer a um agente desse nível, nesse dia: sem regra,
      * ou com pelo menos uma regra diária, aleatória ou de desbloqueio por nível que o nível e a
      * data permitem. Semanais e de evento ficam para a spec do tema semanal; `chance` não é usado.
