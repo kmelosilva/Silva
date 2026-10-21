@@ -28,6 +28,21 @@ enum Category: string
     }
 
     /**
+     * A explicação curta que aparece na escolha de prioridade do alistamento.
+     */
+    public function description(): string
+    {
+        return match ($this) {
+            self::Saude => 'Energia, movimento, sono e alimentação.',
+            self::Mente => 'Leitura, pausa e autoconhecimento.',
+            self::Financas => 'Dinheiro organizado, sem aperto e sem culpa.',
+            self::Carreira => 'Trabalho, estudo e metas para o futuro.',
+            self::Social => 'Amizades, família e as pessoas ao seu redor.',
+            self::Habitos => 'Rotina, tempo e as pequenas escolhas de cada dia.',
+        };
+    }
+
+    /**
      * Como a categoria sai na API: {key, label}.
      *
      * @return array{key: string, label: string}

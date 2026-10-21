@@ -2,8 +2,11 @@
 
 namespace App\Models;
 
+use App\Enums\Category;
 use App\Support\AgentDay;
+use Illuminate\Database\Eloquent\Casts\AsEnumCollection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 
 class Agent extends Model
 {
@@ -16,6 +19,10 @@ class Agent extends Model
         'streak_current',
         'streak_best',
         'last_active_on',
+        'codename',
+        'priorities',
+        'oath_accepted_at',
+        'enlisted_at',
     ];
 
     /**
@@ -36,6 +43,9 @@ class Agent extends Model
             'xp' => 'integer',
             'streak_current' => 'integer',
             'streak_best' => 'integer',
+            'priorities' => AsEnumCollection::of(Category::class),
+            'oath_accepted_at' => 'datetime',
+            'enlisted_at' => 'datetime',
         ];
     }
 
@@ -53,5 +63,15 @@ class Agent extends Model
         return in_array($this->last_active_on, [AgentDay::today(), AgentDay::yesterday()], true)
             ? $this->streak_current
             : 0;
+    }
+
+    /**
+     * As áreas de prioridade do agente, sempre como coleção: sem prioridade é uma coleção vazia.
+     *
+     * @return Collection<int, Category>
+     */
+    public function priorityAreas(): Collection
+    {
+        return $this->priorities ?? new Collection;
     }
 }

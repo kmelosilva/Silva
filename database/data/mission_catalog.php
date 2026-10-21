@@ -19,6 +19,19 @@
 
 $xp = 20; // igual para todas as coordenadas nesta versão
 
+// O código de ética e conduta mora em enlistment.php, junto do juramento que o cita:
+// o mesmo texto aparece no alistamento e nesta coordenada.
+$codeItems = (require __DIR__.'/enlistment.php')['code_of_conduct'];
+$codeOfConduct = implode("\n\n", [
+    'Este é o código que você aceitou no alistamento. São combinados para a jornada inteira, não regras para decorar.',
+    ...array_map(
+        fn (array $item, int $index) => ($index + 1).'. '.$item['title'].' '.$item['text'],
+        $codeItems,
+        array_keys($codeItems),
+    ),
+    'Para cumprir esta coordenada, leia os itens com calma e escolha um para colocar em prática hoje. Pode ser o mais fácil: o importante é começar.',
+]);
+
 return [
     [
         'slug' => 'seja-um-agente',
@@ -30,7 +43,7 @@ return [
             [
                 'slug' => 'siga-o-codigo-de-etica',
                 'title' => 'Siga o código de ética e conduta da Agência',
-                'content' => null, // o código de ética ainda não existe por escrito
+                'content' => $codeOfConduct,
                 'xp' => $xp,
             ],
         ],

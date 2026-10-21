@@ -11,10 +11,21 @@ class AuthController extends Controller
 
     public function register(Request $request)
     {
+        // A declaração de 18+ é exigida e não é gravada: nesta versão a conta é só para adultos.
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
-            'password' => 'required|min:6'
+            'password' => 'required|min:6',
+            'adult' => 'accepted',
+        ], [
+            'name.required' => 'Diga como você se chama.',
+            'name.max' => 'O nome pode ter até 255 caracteres.',
+            'email.required' => 'Informe seu e-mail.',
+            'email.email' => 'Esse e-mail não parece válido.',
+            'email.unique' => 'Já existe uma conta com esse e-mail. Entre com ele.',
+            'password.required' => 'Crie uma senha.',
+            'password.min' => 'A senha precisa de pelo menos 6 caracteres.',
+            'adult.accepted' => 'Nesta versão, a Silva é só para quem tem 18 anos ou mais.',
         ]);
 
         $user = User::create([
