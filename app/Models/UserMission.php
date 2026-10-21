@@ -5,6 +5,9 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * Uma missão aceita pelo agente: em andamento sem completed_at, concluída com ele.
+ */
 class UserMission extends Model
 {
     use HasFactory;
@@ -12,10 +15,17 @@ class UserMission extends Model
     protected $fillable = [
         'user_id',
         'mission_id',
-        'completed',
-        'assigned_date',
-        'completed_at'
+        'accepted_at',
+        'completed_at',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'accepted_at' => 'datetime',
+            'completed_at' => 'datetime',
+        ];
+    }
 
     public function mission()
     {

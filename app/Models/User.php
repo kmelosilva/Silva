@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -12,6 +13,7 @@ class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasApiTokens;
+
     use HasFactory, Notifiable;
 
     /**
@@ -48,13 +50,38 @@ class User extends Authenticatable
         ];
     }
 
+    /**
+     * Toda conta nasce com o seu agente (nível 1, 0 XP).
+     */
+    protected static function booted(): void
+    {
+        static::created(fn (User $user) => $user->agent()->create());
+    }
+
     public function agent()
     {
         return $this->hasOne(Agent::class);
     }
 
+    /**
+     * O agente da conta, criado agora se faltar (conta que escapou da criação e da migração).
+     */
+    public function ensureAgent(): Agent
+    {
+        if (! $this->agent) {
+            $this->setRelation('agent', $this->agent()->firstOrCreate());
+        }
+
+        return $this->agent;
+    }
+
     public function missions()
     {
         return $this->hasMany(UserMission::class);
+    }
+
+    public function coordinateCompletions(): HasMany
+    {
+        return $this->hasMany(CoordinateCompletion::class);
     }
 }
