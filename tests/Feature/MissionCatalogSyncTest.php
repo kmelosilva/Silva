@@ -8,6 +8,7 @@ use App\Models\Mission;
 use App\Models\User;
 use App\Models\UserMission;
 use App\Services\MissionCatalogSync;
+use App\Support\EnlistmentText;
 use Database\Seeders\MissionCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -25,11 +26,28 @@ class MissionCatalogSyncTest extends TestCase
 
         $this->assertSame(8, Mission::count());
         $this->assertSame(11, Coordinate::count());
-        $this->assertSame(10, Coordinate::published()->count());
+        $this->assertSame(11, Coordinate::published()->count());
 
         $entry = Mission::where('slug', 'seja-um-agente')->firstOrFail();
         $this->assertTrue($entry->is_entry);
         $this->assertNull($entry->category);
+    }
+
+    public function test_rn08_coordenada_de_entrada_e_o_codigo_de_etica_do_alistamento(): void
+    {
+        $this->seed(MissionCatalogSeeder::class);
+
+        $content = Coordinate::where('slug', 'siga-o-codigo-de-etica')->firstOrFail()->content;
+        $items = EnlistmentText::codeOfConduct();
+
+        $this->assertNotEmpty($items);
+        foreach ($items as $index => $item) {
+            $this->assertStringContainsString(
+                ($index + 1).'. '.$item['title'].' '.$item['text'],
+                $content,
+                'A coordenada deveria trazer o item '.($index + 1).' do código, igual ao do alistamento.'
+            );
+        }
     }
 
     public function test_rf04_carga_dupla_nao_duplica_nem_regrava(): void
@@ -84,13 +102,13 @@ class MissionCatalogSyncTest extends TestCase
         $coordinate = Coordinate::where('slug', 'escreva-quem-voce-e-hoje')->firstOrFail();
         $this->assertSame(1, $result['retired_coordinates']);
         $this->assertNotNull($coordinate->retired_at);
-        $this->assertSame(9, Coordinate::published()->count());
+        $this->assertSame(10, Coordinate::published()->count());
         $this->assertSame(11, Coordinate::count(), 'Aposentar não pode apagar a linha.');
 
         $sync->sync($catalog);
 
         $this->assertNull($coordinate->fresh()->retired_at);
-        $this->assertSame(10, Coordinate::published()->count());
+        $this->assertSame(11, Coordinate::published()->count());
     }
 
     public function test_rf02_missoes_geradas_sao_aposentadas_sem_ser_apagadas(): void
