@@ -56,6 +56,8 @@ class AgentProgress
             throw $userMission->completed_at ? ProgressRefused::alreadyCompleted() : ProgressRefused::alreadyAccepted();
         }
 
+        $userMission->setRelation('mission', $mission);
+
         return $this->progressFor($userMission, $mission->publishedCoordinates()->get(), []);
     }
 
@@ -79,6 +81,8 @@ class AgentProgress
             if (! $userMission) {
                 throw ProgressRefused::notAccepted();
             }
+
+            $userMission->setRelation('mission', $mission);
 
             $published = $mission->publishedCoordinates()->get();
             $completedIds = $this->completedCoordinateIds($user);
@@ -122,14 +126,6 @@ class AgentProgress
                 $progress, $agent, $coordinate->xp, $agent->level - $levelBefore, $missionCompleted, false,
             );
         });
-    }
-
-    /**
-     * Quantas missões o agente concluiu.
-     */
-    public function missionsCompleted(User $user): int
-    {
-        return $user->missions()->whereNotNull('completed_at')->count();
     }
 
     /**

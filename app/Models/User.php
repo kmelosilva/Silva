@@ -64,15 +64,15 @@ class User extends Authenticatable
     }
 
     /**
-     * O agente da conta, criado agora se faltar (conta que escapou da criação e da migração).
+     * O agente da conta, lido do banco a cada chamada e criado agora se faltar
+     * (conta que escapou da criação e da migração).
      */
     public function ensureAgent(): Agent
     {
-        if (! $this->agent) {
-            $this->setRelation('agent', $this->agent()->firstOrCreate());
-        }
+        $agent = $this->agent()->firstOrCreate();
+        $this->setRelation('agent', $agent);
 
-        return $this->agent;
+        return $agent;
     }
 
     public function missions()
