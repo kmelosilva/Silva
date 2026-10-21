@@ -20,6 +20,7 @@ class AgentTest extends TestCase
             'name' => 'Ana',
             'email' => 'ana@example.com',
             'password' => 'segredo123',
+            'adult' => true,
         ])->assertCreated();
 
         $agent = User::where('email', 'ana@example.com')->firstOrFail()->agent;
