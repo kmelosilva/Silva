@@ -7,6 +7,7 @@ use App\Models\Coordinate;
 use App\Models\Mission;
 use App\Models\User;
 use App\Models\UserMission;
+use App\Support\ContentRules;
 use App\Support\EnlistmentText;
 use Database\Seeders\MissionCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -341,7 +342,7 @@ class EnlistmentTest extends TestCase
         ];
 
         foreach ($texts as $text) {
-            $this->assertDoesNotMatchRegularExpression('/\b(peso|imc|balança|caloria|emagre)/iu', $text);
+            $this->assertSame([], ContentRules::forbiddenTermsIn($text), "Termo proibido em: {$text}");
         }
     }
 

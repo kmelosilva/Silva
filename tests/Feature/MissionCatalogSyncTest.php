@@ -179,6 +179,24 @@ class MissionCatalogSyncTest extends TestCase
                 return $c;
             }, 'Slug repetido na missão corpo-sao-mente-sa'],
             'catálogo vazio' => [fn (array $c) => [], 'está vazio'],
+            'termo proibido no título da missão' => [
+                fn (array $c) => self::with($c, 1, 'title', 'Não espere o Sol para queimar energia'),
+                'A missão nao-espere-o-sol usa "queimar", que a regra "saúde sem peso" não permite.',
+            ],
+            'termo proibido na descrição' => [
+                fn (array $c) => self::with($c, 1, 'description', 'Uma hora livre sem contar calorias nem pensar no peso.'),
+                'A missão nao-espere-o-sol usa "peso", "caloria"',
+            ],
+            'termo proibido no título da coordenada' => [function (array $c) {
+                $c[1]['coordinates'][0]['title'] = 'Comece a dieta';
+
+                return $c;
+            }, 'A coordenada acorde-meia-hora-antes da missão nao-espere-o-sol usa "dieta"'],
+            'termo proibido no texto, com maiúscula' => [function (array $c) {
+                $c[1]['coordinates'][0]['content'] = "Acorde cedo.\n\nSem Besteira no café.";
+
+                return $c;
+            }, 'usa "besteira"'],
         ];
     }
 
