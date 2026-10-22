@@ -75,9 +75,10 @@ return [
     // Versão inicial de 2026-10-21 (spec conteudo_missoes-de-saude), escrita a partir das
     // coordenadas de corpo do mockup "Corpo são, mente sã" (Drive, 2023) e da abertura
     // "Saia do piloto automático", aguardando a reescrita do Kayque. Cada coordenada fecha
-    // com "Dia difícil?", a versão leve. Fontes conferidas no texto original em 2026-10-21:
-    // - Guia Alimentar para a População Brasileira, 2ª ed., Ministério da Saúde, 2014 (passo 5);
-    // - Guia de Atividade Física para a População Brasileira, Ministério da Saúde, 2021.
+    // com "Dia difícil?", a versão leve. Fontes, conferidas em 2026-10-21:
+    // - Guia Alimentar para a População Brasileira, 2ª ed., Ministério da Saúde, 2014 (passo 5),
+    //   lido num material do Idec feito a partir do guia e numa apresentação do Ministério sobre ele;
+    // - Guia de Atividade Física para a População Brasileira, Ministério da Saúde, 2021 (p. 6 do PDF).
     [
         'slug' => 'corpo-sao',
         'title' => 'Corpo são',
