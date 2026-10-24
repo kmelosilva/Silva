@@ -3,14 +3,102 @@
 namespace Tests\Feature;
 
 use App\Enums\Category;
+use App\Models\Agent;
+use App\Models\Coordinate;
+use App\Models\Mission;
+use App\Models\User;
 use App\Support\ContentRules;
 use App\Support\MentoringText;
+use Database\Seeders\MissionCatalogSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class SubmentorTest extends TestCase
 {
+    use RefreshDatabase;
+
     /** Saudação que marca o gênero do agente (RN-16). */
     private const GENDERED_GREETING = '/\bbem[- ]?vind[oa]s?\b/iu';
+
+    public function test_sem_login_responde_401(): void
+    {
+        $this->getJson('/api/submentors')->assertUnauthorized();
+        $this->postJson('/api/submentors/saude/met')->assertUnauthorized();
+    }
+
+    public function test_rn03_lista_so_as_areas_com_missao_na_ordem_das_categorias(): void
+    {
+        $this->seed(MissionCatalogSeeder::class);
+        $this->signIn();
+
+        $this->getJson('/api/submentors')
+            ->assertOk()
+            ->assertJsonPath('data.*.area.key', ['saude', 'mente', 'financas', 'carreira', 'habitos'])
+            ->assertJsonPath('data.*.codename', ['Pintada da Silva', 'Jabu da Silva', 'Tito da Silva', 'Guia da Silva', 'Bel da Silva'])
+            ->assertJsonPath('data.*.met', [false, false, false, false, false]);
+    }
+
+    public function test_rn03_social_ganha_submentor_quando_a_area_ganha_missao(): void
+    {
+        $this->seed(MissionCatalogSeeder::class);
+        $this->signIn();
+        $mission = Mission::create(['slug' => 'roda-de-conversa', 'title' => 'Roda de conversa', 'category' => Category::Social, 'position' => 99]);
+        Coordinate::create(['mission_id' => $mission->id, 'slug' => 'ligue-para-alguem', 'position' => 1, 'title' => 'Ligue para alguém', 'content' => 'Ligue para alguém de quem você sente falta.', 'xp' => 20]);
+
+        $this->assertContains('Capi da Silva', $this->getJson('/api/submentors')->assertOk()->json('data.*.codename'));
+    }
+
+    public function test_rf01_conhecer_o_submentor_marca_a_area_e_repetir_mantem(): void
+    {
+        $this->seed(MissionCatalogSeeder::class);
+        $user = $this->signIn();
+
+        $this->postJson('/api/submentors/mente/met')
+            ->assertOk()
+            ->assertExactJson(['data' => ['area' => 'mente', 'met' => true]]);
+        $this->postJson('/api/submentors/mente/met')->assertOk();
+        $this->postJson('/api/submentors/saude/met')->assertOk();
+
+        $listed = collect($this->getJson('/api/submentors')->assertOk()->json('data'))->pluck('met', 'area.key');
+        $this->assertSame(['saude' => true, 'mente' => true, 'financas' => false, 'carreira' => false, 'habitos' => false], $listed->all());
+        $this->assertSame(['mente', 'saude'], Agent::where('user_id', $user->id)->first()->metSubmentors()->pluck('value')->all(), 'Repetir não grava de novo.');
+    }
+
+    public function test_rn03_area_inexistente_ou_sem_missao_da_404(): void
+    {
+        $this->seed(MissionCatalogSeeder::class);
+        $this->signIn();
+
+        $this->postJson('/api/submentors/corpo/met')->assertNotFound();
+        $this->postJson('/api/submentors/social/met')->assertNotFound();
+    }
+
+    public function test_rnf08_conta_antiga_sem_marca_nenhuma_funciona(): void
+    {
+        $this->seed(MissionCatalogSeeder::class);
+        $user = $this->signIn();
+        Agent::where('user_id', $user->id)->update(['submentors_met' => null]);
+
+        $this->getJson('/api/submentors')->assertOk()->assertJsonPath('data.0.met', false);
+        $this->postJson('/api/submentors/saude/met')->assertOk();
+    }
+
+    public function test_contrato_do_submentor_tem_exatamente_os_campos_combinados(): void
+    {
+        $this->seed(MissionCatalogSeeder::class);
+        $this->signIn();
+
+        $submentor = $this->getJson('/api/submentors')->assertOk()->json('data.0');
+
+        $this->assertSame(
+            ['area', 'codename', 'animal', 'power_up', 'intro', 'closing', 'welcome_backs', 'notice', 'care_footer', 'met'],
+            array_keys($submentor)
+        );
+        $this->assertSame(['key', 'label'], array_keys($submentor['area']));
+        $this->assertStringContainsString('Pintada da Silva', $submentor['notice']);
+        $this->assertStringContainsString('188', $submentor['care_footer']);
+    }
 
     public function test_rn01_cada_area_tem_um_submentor_da_silva(): void
     {
@@ -111,6 +199,14 @@ class SubmentorTest extends TestCase
         foreach (array_keys(ContentRules::FORBIDDEN_TERMS) as $term) {
             $this->assertStringContainsString('"'.$term.'"', $rules);
         }
+    }
+
+    private function signIn(): User
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+
+        return $user;
     }
 
     /**
