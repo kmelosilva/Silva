@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Enums\Category;
 use App\Models\Agent;
+use App\Models\CoordinateCompletion;
+use App\Models\Mission;
 use App\Models\Reflection;
 use App\Models\User;
 use App\Support\MentoringText;
@@ -162,6 +164,106 @@ class ReflectionTest extends TestCase
         }
 
         $this->reflect(self::MISSION, self::FIRST, 'Envio 11.')->assertTooManyRequests();
+    }
+
+    public function test_rf07_lista_so_as_do_agente_por_missao_e_pela_posicao_da_coordenada(): void
+    {
+        $this->signIn();
+        $this->accept('negociando-com-cronos');
+        $this->complete('negociando-com-cronos', 'escolha-tres-prioridades');
+        $this->reflect('negociando-com-cronos', 'escolha-tres-prioridades', 'Escolhi três.');
+        $this->accept(self::MISSION);
+        $this->complete(self::MISSION, self::FIRST);
+        $this->complete(self::MISSION, self::SECOND);
+        $this->reflect(self::MISSION, self::SECOND, 'Fiz a pausa.');
+        $this->reflect(self::MISSION, self::FIRST, 'Li dez páginas.');
+
+        $this->signIn();
+        $this->accept(self::MISSION);
+        $this->complete(self::MISSION, self::FIRST);
+        $this->reflect(self::MISSION, self::FIRST, 'Outro agente.');
+        Sanctum::actingAs(User::orderBy('id')->firstOrFail());
+
+        $all = $this->getJson('/api/reflections')->assertOk()->json('data');
+        $this->assertSame(
+            [[self::MISSION, self::FIRST], [self::MISSION, self::SECOND], ['negociando-com-cronos', 'escolha-tres-prioridades']],
+            array_map(fn (array $r) => [$r['mission_slug'], $r['coordinate_slug']], $all),
+            'Na ordem do catálogo: Mente sã vem antes de Negociando com Cronos.'
+        );
+        $this->assertNotContains('Outro agente.', array_column($all, 'text'));
+
+        $this->getJson('/api/reflections?mission='.self::MISSION)
+            ->assertOk()
+            ->assertJsonPath('data.*.text', ['Li dez páginas.', 'Fiz a pausa.']);
+        $this->getJson('/api/reflections?mission=nao-existe')->assertOk()->assertJsonCount(0, 'data');
+    }
+
+    public function test_rf07_apagar_tira_a_linha_e_nao_mexe_no_progresso_nem_na_marca_da_ia(): void
+    {
+        $user = $this->signIn();
+        $this->accept(self::MISSION);
+        $this->complete(self::MISSION, self::FIRST);
+        $id = $this->reflect(self::MISSION, self::FIRST, 'Li dez páginas.')->json('data.id');
+        CoordinateCompletion::where('user_id', $user->id)->update(['ai_replied_at' => now()]);
+        $before = [$this->agentState($user), $this->getJson('/api/missions/my')->json('data')];
+
+        $this->deleteJson("/api/reflections/{$id}")->assertNoContent();
+
+        $this->assertDatabaseMissing('reflections', ['id' => $id]);
+        $this->assertSame($before, [$this->agentState($user), $this->getJson('/api/missions/my')->json('data')]);
+        $this->assertNotNull(CoordinateCompletion::where('user_id', $user->id)->value('ai_replied_at'), 'A marca da IA fica.');
+        $this->deleteJson("/api/reflections/{$id}")->assertNotFound();
+    }
+
+    public function test_rf07_apagar_todas_tira_so_as_do_agente(): void
+    {
+        $this->signIn();
+        $this->accept(self::MISSION);
+        $this->complete(self::MISSION, self::FIRST);
+        $this->reflect(self::MISSION, self::FIRST, 'Do outro agente.');
+
+        $this->signIn();
+        $this->accept(self::MISSION);
+        $this->complete(self::MISSION, self::FIRST);
+        $this->complete(self::MISSION, self::SECOND);
+        $this->reflect(self::MISSION, self::FIRST, 'Minha 1.');
+        $this->reflect(self::MISSION, self::SECOND, 'Minha 2.');
+
+        $this->deleteJson('/api/reflections')->assertNoContent();
+
+        $this->getJson('/api/reflections')->assertOk()->assertJsonCount(0, 'data');
+        $this->assertSame(['Do outro agente.'], Reflection::pluck('text')->all());
+    }
+
+    public function test_rf07_reflexao_de_outro_agente_nao_aparece_nem_e_apagada(): void
+    {
+        $this->signIn();
+        $this->accept(self::MISSION);
+        $this->complete(self::MISSION, self::FIRST);
+        $id = $this->reflect(self::MISSION, self::FIRST, 'Só minha.')->json('data.id');
+
+        $this->signIn();
+
+        $this->getJson('/api/reflections')->assertOk()->assertJsonCount(0, 'data');
+        $this->deleteJson("/api/reflections/{$id}")
+            ->assertNotFound()
+            ->assertJson(['message' => 'Reflexão não encontrada.']);
+        $this->assertDatabaseHas('reflections', ['id' => $id]);
+    }
+
+    public function test_rn14_missao_que_saiu_do_catalogo_continua_na_lista_com_o_titulo(): void
+    {
+        $this->signIn();
+        $this->accept(self::MISSION);
+        $this->complete(self::MISSION, self::FIRST);
+        $this->reflect(self::MISSION, self::FIRST, 'Li dez páginas.');
+
+        Mission::where('slug', self::MISSION)->update(['retired_at' => now()]);
+
+        $this->getJson('/api/reflections')
+            ->assertOk()
+            ->assertJsonPath('data.0.mission_title', 'Mente sã')
+            ->assertJsonPath('data.0.coordinate_title', 'Leia dez páginas de um livro');
     }
 
     public function test_contrato_da_reflexao_tem_exatamente_os_campos_combinados(): void

@@ -8,10 +8,45 @@ use App\Models\Coordinate;
 use App\Models\Mission;
 use App\Services\Mentoring\Mentoring;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Response;
 
 class ReflectionController extends Controller
 {
     public function __construct(private readonly Mentoring $mentoring) {}
+
+    /**
+     * As reflexões do agente, por missão e pela posição da coordenada; ?mission= filtra uma missão.
+     */
+    public function index(Request $request): AnonymousResourceCollection
+    {
+        $mission = $request->query('mission');
+
+        return ReflectionResource::collection(
+            $this->mentoring->reflectionsOf($request->user(), is_string($mission) ? $mission : null)
+        );
+    }
+
+    /**
+     * Apaga uma reflexão. A de outro agente dá 404, sem dizer que existe.
+     */
+    public function destroy(Request $request, int $reflection): Response
+    {
+        abort_unless($this->mentoring->forget($request->user(), $reflection), 404, 'Reflexão não encontrada.');
+
+        return response()->noContent();
+    }
+
+    /**
+     * Apaga todas as reflexões do agente.
+     */
+    public function destroyAll(Request $request): Response
+    {
+        $this->mentoring->forgetAll($request->user());
+
+        return response()->noContent();
+    }
 
     /**
      * Guarda a reflexão sobre uma coordenada cumprida e devolve a resposta do submentor:

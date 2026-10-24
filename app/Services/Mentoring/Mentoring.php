@@ -12,6 +12,7 @@ use App\Models\Reflection;
 use App\Models\User;
 use App\Support\CareSignals;
 use App\Support\MentoringText;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
@@ -104,6 +105,47 @@ class Mentoring
                     'reply_source' => $answer->source,
                 ]);
             });
+    }
+
+    /**
+     * As reflexões do agente, na ordem das missões e das coordenadas; só de uma missão,
+     * se o slug vier. Missão ou coordenada que saiu do catálogo continua aparecendo.
+     *
+     * @return Collection<int, Reflection>
+     */
+    public function reflectionsOf(User $user, ?string $missionSlug = null): Collection
+    {
+        return Reflection::query()
+            ->select('reflections.*')
+            ->join('coordinate_completions', 'coordinate_completions.id', '=', 'reflections.coordinate_completion_id')
+            ->join('coordinates', 'coordinates.id', '=', 'coordinate_completions.coordinate_id')
+            ->join('missions', 'missions.id', '=', 'coordinates.mission_id')
+            ->where('reflections.user_id', $user->id)
+            ->when($missionSlug !== null, fn ($query) => $query->where('missions.slug', $missionSlug))
+            ->orderBy('missions.position')
+            ->orderBy('coordinates.position')
+            ->orderBy('reflections.id')
+            ->with('completion.coordinate.mission')
+            ->get();
+    }
+
+    /**
+     * Apaga uma reflexão do agente, de verdade. A marca de que a IA já respondeu fica na
+     * conclusão, e o XP, o nível, a sequência e o progresso ficam como estão.
+     *
+     * @return bool falso quando a reflexão não existe ou é de outro agente
+     */
+    public function forget(User $user, int $reflectionId): bool
+    {
+        return Reflection::where('user_id', $user->id)->whereKey($reflectionId)->delete() === 1;
+    }
+
+    /**
+     * Apaga todas as reflexões do agente.
+     */
+    public function forgetAll(User $user): void
+    {
+        Reflection::where('user_id', $user->id)->delete();
     }
 
     /**

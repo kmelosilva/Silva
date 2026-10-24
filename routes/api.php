@@ -37,6 +37,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/missions/{mission}/coordinates/{coordinate}/reflection', [ReflectionController::class, 'store'])
         ->middleware('throttle:reflections');
 
+    Route::get('/reflections', [ReflectionController::class, 'index']);
+    Route::delete('/reflections', [ReflectionController::class, 'destroyAll']);
+    Route::delete('/reflections/{reflection}', [ReflectionController::class, 'destroy'])->whereNumber('reflection');
+
     Route::get('/submentors', [SubmentorController::class, 'index']);
     Route::post('/submentors/{area}/met', [SubmentorController::class, 'met']);
 
