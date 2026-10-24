@@ -28,6 +28,7 @@ class MissionProgressResource extends JsonResource
             'next_coordinate' => $progress->nextCoordinate?->slug,
             'accepted_at' => $userMission->accepted_at?->toJSON(),
             'completed_at' => $userMission->completed_at?->toJSON(),
+            'welcome_back' => $progress->welcomesBack(),
         ];
     }
 }

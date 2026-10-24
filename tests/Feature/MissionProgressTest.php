@@ -7,6 +7,8 @@ use App\Models\CoordinateCompletion;
 use App\Models\Mission;
 use App\Models\User;
 use App\Models\UserMission;
+use App\Support\AgentDay;
+use Carbon\CarbonImmutable;
 use Database\Seeders\MissionCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
@@ -350,10 +352,83 @@ class MissionProgressTest extends TestCase
             ->assertJsonPath('data.1.next_coordinate', self::SECOND);
     }
 
+    public function test_rf06_missao_aceita_ha_10_dias_sem_coordenada_cumprida_da_boas_vindas(): void
+    {
+        $this->signIn();
+        $this->travelTo($this->brasilia('2026-10-14 09:00'));
+        $this->accept(self::MISSION)->assertJsonPath('data.welcome_back', false);
+
+        $this->travelTo($this->brasilia('2026-10-24 09:00'));
+
+        $this->getJson('/api/missions/my')->assertOk()->assertJsonPath('data.0.welcome_back', true);
+    }
+
+    /**
+     * @return array<string, array{string, bool}>
+     */
+    public static function daysSinceTheLastCoordinate(): array
+    {
+        return [
+            'há 7 dias' => ['2026-10-17 09:00', true],
+            'há 6 dias' => ['2026-10-18 09:00', false],
+            'hoje' => ['2026-10-24 08:00', false],
+        ];
+    }
+
+    #[DataProvider('daysSinceTheLastCoordinate')]
+    public function test_rf06_conta_a_partir_da_ultima_coordenada_cumprida(string $completedAt, bool $welcomeBack): void
+    {
+        $this->signIn();
+        $this->travelTo($this->brasilia('2026-10-01 09:00'));
+        $this->accept(self::MISSION);
+        $this->travelTo($this->brasilia($completedAt));
+        $this->complete(self::MISSION, self::FIRST)->assertJsonPath('data.progress.welcome_back', false);
+
+        $this->travelTo($this->brasilia('2026-10-24 09:00'));
+
+        $this->getJson('/api/missions/my')->assertOk()->assertJsonPath('data.0.welcome_back', $welcomeBack);
+    }
+
+    public function test_rf06_missao_concluida_nao_da_boas_vindas(): void
+    {
+        $this->signIn();
+        $this->travelTo($this->brasilia('2026-10-01 09:00'));
+        $this->accept(self::MISSION);
+        foreach ([self::FIRST, self::SECOND, self::THIRD] as $coordinate) {
+            $this->complete(self::MISSION, $coordinate);
+        }
+
+        $this->travelTo($this->brasilia('2026-10-24 09:00'));
+
+        $this->getJson('/api/missions/my')
+            ->assertOk()
+            ->assertJsonPath('data.0.status', 'completed')
+            ->assertJsonPath('data.0.welcome_back', false);
+    }
+
+    public function test_rf06_o_prazo_conta_dias_de_brasilia_e_nao_de_utc(): void
+    {
+        $this->signIn();
+        $this->travelTo($this->brasilia('2026-10-01 09:00'));
+        $this->accept(self::MISSION);
+        $this->accept('negociando-com-cronos');
+        $this->travelTo($this->brasilia('2026-10-17 10:00'));
+        $this->complete('negociando-com-cronos', 'escolha-tres-prioridades');
+        $this->travelTo($this->brasilia('2026-10-18 10:00'));
+        $this->complete(self::MISSION, self::FIRST);
+
+        // 22h de 24/10 em Brasília já é 25/10 em UTC: pelo UTC, as duas dariam boas-vindas.
+        $this->travelTo($this->brasilia('2026-10-24 22:00'));
+        $progress = collect($this->getJson('/api/missions/my')->assertOk()->json('data'))->keyBy('mission_slug');
+
+        $this->assertTrue($progress['negociando-com-cronos']['welcome_back'], '7 dias de Brasília');
+        $this->assertFalse($progress[self::MISSION]['welcome_back'], '6 dias de Brasília, 7 de UTC');
+    }
+
     public function test_contrato_do_progresso_tem_exatamente_os_campos_combinados(): void
     {
         $this->signIn();
-        $progressFields = ['mission_slug', 'status', 'completed_coordinates', 'next_coordinate', 'accepted_at', 'completed_at'];
+        $progressFields = ['mission_slug', 'status', 'completed_coordinates', 'next_coordinate', 'accepted_at', 'completed_at', 'welcome_back'];
 
         $this->assertSame($progressFields, array_keys($this->accept(self::MISSION)->json('data')));
         $this->assertSame($progressFields, array_keys($this->getJson('/api/missions/my')->json('data.0')));
@@ -366,6 +441,11 @@ class MissionProgressTest extends TestCase
             ['xp_gained', 'levels_gained', 'mission_completed', 'already_completed'],
             array_keys($completion['result'])
         );
+    }
+
+    private function brasilia(string $moment): CarbonImmutable
+    {
+        return CarbonImmutable::parse($moment, AgentDay::TIMEZONE);
     }
 
     private function signIn(): User
