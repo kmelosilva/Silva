@@ -136,6 +136,15 @@ class MissionCatalogSyncTest extends TestCase
         $this->assertFalse(Coordinate::where('slug', 'leia-dez-paginas')->value('physical_effort'), 'Sem a marca, a coordenada fica sem aviso.');
     }
 
+    public function test_rf02_carga_grava_o_briefing_das_missoes_dos_modulos(): void
+    {
+        $this->seed(MissionCatalogSeeder::class);
+
+        $this->assertSame(8, Mission::where('is_entry', false)->whereNotNull('briefing')->count());
+        $this->assertNull(Mission::where('slug', 'seja-um-agente')->value('briefing'));
+        $this->assertStringContainsString('Tênis Energéticos', Mission::where('slug', 'corpo-sao')->value('briefing'));
+    }
+
     public function test_rf02_texto_em_varias_linhas_vira_paragrafo(): void
     {
         $catalog = $this->catalog();
@@ -210,6 +219,12 @@ class MissionCatalogSyncTest extends TestCase
 
                 return $c;
             }, 'A marca de esforço físico precisa ser true ou false'],
+            'termo proibido no briefing' => [
+                fn (array $c) => self::with($c, 1, 'briefing', 'Prepara o Chá do Foco, sem dieta nenhuma.'),
+                'A missão nao-espere-o-sol usa "dieta"',
+            ],
+            'briefing que não é texto' => [fn (array $c) => self::with($c, 1, 'briefing', ['oi']), 'Briefing inválido'],
+            'briefing na missão de entrada' => [fn (array $c) => self::with($c, 0, 'briefing', 'Oi, agente.'), 'não tem briefing'],
             'termo proibido no texto, com maiúscula' => [function (array $c) {
                 $c[1]['coordinates'][0]['content'] = "Acorde cedo.\n\nSem Besteira no café.";
 

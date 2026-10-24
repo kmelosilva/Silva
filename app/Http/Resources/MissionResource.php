@@ -24,6 +24,7 @@ class MissionResource extends JsonResource
             'slug' => $this->slug,
             'title' => $this->title,
             'description' => $this->description,
+            'briefing' => $this->briefing,
             'category' => $this->category?->toArray(),
             'coordinates_count' => $coordinates->count(),
             'xp_total' => (int) $coordinates->sum('xp'),

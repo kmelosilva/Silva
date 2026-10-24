@@ -12,6 +12,10 @@
  * - "slug" é a chave da carga: mudar o slug cria outra missão e aposenta a antiga.
  * - A ordem do array é a ordem de exibição, das missões e das coordenadas.
  * - "category" usa as chaves de App\Enums\Category; a missão de entrada não tem.
+ * - "briefing" é a fala do submentor da área ao aceitar a missão (spec mentoria_submentores,
+ *   RF-02), na voz descrita em mentoring.php. Opcional; a missão de entrada não tem, porque
+ *   quem fala nela é o Agente Silva. Versão inicial de 2026-10-24, aguardando a revisão do
+ *   Kayque. Como toda fala de submentor, não marca o gênero do agente.
  * - Coordenada com "content" null fica oculta, e missão sem coordenada com texto também.
  * - Linhas seguidas viram um parágrafo; uma linha em branco separa parágrafos.
  * - "physical" => true marca a coordenada com esforço físico: a tela mostra o aviso de
@@ -55,6 +59,7 @@ return [
         'slug' => 'nao-espere-o-sol',
         'title' => 'Não espere o Sol',
         'description' => 'A primeira hora do dia é território livre: ninguém te liga, ninguém te cobra. Esta missão é tomar posse dela.',
+        'briefing' => 'Esta missão é sobre a primeira meia hora do dia, antes de o mundo começar a pedir coisas. Não é para render mais nem para virar quem acorda às 5: é um tempo só seu, que muda o tom do resto do dia. Prepara o Chá do Foco, que eu vou junto.',
         'category' => 'habitos',
         'coordinates' => [
             [
@@ -83,6 +88,7 @@ return [
         'slug' => 'corpo-sao',
         'title' => 'Corpo são',
         'description' => 'Saia do piloto automático: quatro cuidados com o corpo, no seu ritmo e com o que você já tem.',
+        'briefing' => 'Bora cuidar do corpo que te leva para todo canto? São quatro cuidados simples: mexer do seu jeito, comer com calma, ter água por perto e preparar o sono. Nada aqui pede academia, compra ou corpo de atleta, só o seu ritmo, e eu vou junto com os Tênis Energéticos.',
         'category' => 'saude',
         'coordinates' => [
             [
@@ -156,6 +162,7 @@ return [
         'slug' => 'corpo-sao-mente-sa',
         'title' => 'Mente sã',
         'description' => 'Três hábitos pequenos para treinar a cabeça: ler, pausar e se conhecer. Nenhum pede mais do que alguns minutos.',
+        'briefing' => 'Três hábitos pequenos para a cabeça: ler um pouco, parar um pouco e se olhar um pouco. Nenhum pede mais do que alguns minutos, e nenhum tem pressa. Abre o Kit da Sabedoria comigo, devagar, que a mente agradece.',
         'category' => 'mente',
         'coordinates' => [
             [
@@ -203,6 +210,7 @@ return [
         'slug' => 'luz-no-fim-do-tunel',
         'title' => 'Luz no fim do túnel',
         'description' => 'Todo agente tem um problema que vem adiando. Esta missão é olhar para ele de frente, um passo de cada vez.',
+        'briefing' => 'Todo mundo carrega um problema que vem adiando, e ele costuma parecer maior no escuro. Esta missão não pede para resolver tudo, só para acender a lanterna e dar o primeiro passo. Eu ilumino o caminho com você.',
         'category' => 'mente',
         'coordinates' => [
             [
@@ -224,6 +232,7 @@ return [
         'slug' => 'negociando-com-cronos',
         'title' => 'Negociando com Cronos',
         'description' => 'Cronos, o senhor do tempo, não dá desconto para ninguém. Mas aceita negociar com quem chega com um plano.',
+        'briefing' => 'Cronos não dá desconto, mas negocia com quem chega com um plano. Nesta missão, você escolhe o que importa hoje e transforma um desejo em meta de verdade. A Bússola do Propósito ajuda a achar o norte quando tudo parece urgente.',
         'category' => 'carreira',
         'coordinates' => [
             [
@@ -258,6 +267,7 @@ return [
         'slug' => 'gerindo-recursos',
         'title' => 'Gerindo recursos',
         'description' => 'Todo agente precisa saber com que recursos conta. Esta missão é olhar para o seu dinheiro sem medo.',
+        'briefing' => 'Antes de montar qualquer escudo, a gente precisa saber o que entra e o que sai. Esta missão é olhar para o seu dinheiro sem medo e sem vergonha, só para enxergar melhor. Ninguém aqui vai julgar gasto: o casco é de proteção.',
         'category' => 'financas',
         'coordinates' => [
             [
@@ -279,6 +289,7 @@ return [
         'slug' => 'nova-realidade',
         'title' => 'Nova realidade',
         'description' => 'A realidade é uma construção, feita de escolhas pequenas. Esta missão é fazer uma escolha diferente da de sempre.',
+        'briefing' => 'A realidade se constrói com escolhas pequenas, e às vezes uma escolha nova muda o caminho inteiro. Esta missão é fazer uma coisa pela primeira vez, do tamanho que der. Até jabuti experimenta trilha nova de vez em quando.',
         'category' => 'mente',
         'coordinates' => [
             [
@@ -300,6 +311,7 @@ return [
         'slug' => 'celebre-a-vida',
         'title' => 'Celebre a vida',
         'description' => 'Agente que só olha para o que falta esquece o caminho que já fez. Esta missão é comemorar.',
+        'briefing' => 'Quem só olha para o que falta esquece o caminho que já fez. Esta missão é parar e comemorar uma conquista sua, mesmo que pareça pequena. Eu trago a lanterna, e você escolhe o que merece festa.',
         'category' => 'mente',
         'coordinates' => [
             [

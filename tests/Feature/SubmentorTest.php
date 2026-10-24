@@ -44,6 +44,16 @@ class SubmentorTest extends TestCase
         }
     }
 
+    public function test_rn16_o_briefing_de_cada_missao_tambem_nao_marca_o_genero(): void
+    {
+        $briefings = array_filter(array_column(require database_path('data/mission_catalog.php'), 'briefing', 'slug'));
+
+        $this->assertCount(8, $briefings);
+        foreach ($briefings as $slug => $briefing) {
+            $this->assertDoesNotMatchRegularExpression(self::GENDERED_GREETING, $briefing, "Saudação com gênero no briefing de {$slug}");
+        }
+    }
+
     public function test_rf06_cada_submentor_tem_pelo_menos_5_boas_vindas_diferentes(): void
     {
         foreach (Category::cases() as $area) {
