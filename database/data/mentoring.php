@@ -148,7 +148,7 @@ return [
 
     // Fora do personagem: igual para todas as áreas, sem retrato e sem cor de área (RF-04).
     'care' => [
-        'message' => 'Parece que você está passando por um momento muito difícil, e você não precisa enfrentar isso sem apoio. O CVV (Centro de Valorização da Vida) conversa com qualquer pessoa, de graça e em sigilo: ligue 188, a qualquer hora, ou acesse cvv.org.br. Se você corre perigo agora, ligue 192 (SAMU) ou vá ao pronto-socorro mais perto, e, se puder, chame alguém em quem você confia para ficar com você.',
+        'message' => 'Parece que você está passando por um momento muito difícil, e você não precisa enfrentar isso sem apoio. O CVV (Centro de Valorização da Vida) conversa com qualquer pessoa, de graça e em sigilo: ligue 188, a qualquer hora, ou acesse cvv.org.br. Se você corre perigo agora, ligue 192 (SAMU) ou 190 (polícia), ou vá ao pronto-socorro mais perto. E, se puder, chame alguém em quem você confia para ficar com você.',
         'footer' => 'Se estiver difícil demais, o CVV escuta: ligue 188 ou acesse cvv.org.br.',
     ],
 
