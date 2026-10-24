@@ -41,6 +41,7 @@ class MissionCatalogSync
                     [
                         'title' => $item['title'],
                         'description' => $item['description'] ?? null,
+                        'briefing' => $this->normalize($item['briefing'] ?? null),
                         'category' => $item['category'] ?? null,
                         'is_entry' => $item['is_entry'] ?? false,
                         'position' => $index + 1,
@@ -129,10 +130,19 @@ class MissionCatalogSync
             $this->assertAllowedText($item['title'], $where);
             $this->assertAllowedText($item['description'] ?? null, $where);
 
+            $briefing = $item['briefing'] ?? null;
+            if ($briefing !== null && ! is_string($briefing)) {
+                throw new InvalidArgumentException("Briefing inválido na {$where}.");
+            }
+            $this->assertAllowedText($briefing, $where);
+
             $isEntry = $item['is_entry'] ?? false;
             $category = $item['category'] ?? null;
             if ($isEntry && $category !== null) {
                 throw new InvalidArgumentException("A {$where} é de entrada e não pode ter categoria.");
+            }
+            if ($isEntry && $briefing !== null) {
+                throw new InvalidArgumentException("A {$where} é de entrada e não tem briefing: quem fala nela é o Agente Silva.");
             }
             if (! $isEntry && (! is_string($category) || Category::tryFrom($category) === null)) {
                 throw new InvalidArgumentException(

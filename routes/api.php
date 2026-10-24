@@ -7,6 +7,8 @@ use App\Http\Controllers\EnlistmentController;
 use App\Http\Controllers\MissionController;
 use App\Http\Controllers\MissionProgressController;
 use App\Http\Controllers\PriorityAreaController;
+use App\Http\Controllers\ReflectionController;
+use App\Http\Controllers\SubmentorController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -31,5 +33,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/missions/my', [MissionProgressController::class, 'index']);
     Route::post('/missions/{mission}/accept', [MissionProgressController::class, 'accept']);
     Route::post('/missions/{mission}/coordinates/{coordinate}/complete', [MissionProgressController::class, 'complete']);
+
+    Route::post('/missions/{mission}/coordinates/{coordinate}/reflection', [ReflectionController::class, 'store'])
+        ->middleware('throttle:reflections');
+
+    Route::get('/reflections', [ReflectionController::class, 'index']);
+    Route::delete('/reflections', [ReflectionController::class, 'destroyAll']);
+    Route::delete('/reflections/{reflection}', [ReflectionController::class, 'destroy'])->whereNumber('reflection');
+
+    Route::get('/submentors', [SubmentorController::class, 'index']);
+    Route::post('/submentors/{area}/met', [SubmentorController::class, 'met']);
 
 });

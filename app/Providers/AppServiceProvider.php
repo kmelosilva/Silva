@@ -2,6 +2,11 @@
 
 namespace App\Providers;
 
+use App\Services\Mentoring\ClaudeMentorModel;
+use App\Services\Mentoring\MentorModel;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -11,7 +16,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // A resposta do submentor à reflexão (spec mentoria_submentores, D-05).
+        $this->app->bind(MentorModel::class, fn () => ClaudeMentorModel::fromConfig());
     }
 
     /**
@@ -19,6 +25,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Cada reflexão pode custar uma chamada à IA: 10 por minuto por agente, contra abuso.
+        RateLimiter::for('reflections', fn (Request $request) => Limit::perMinute(10)->by($request->user()?->id ?: $request->ip()));
     }
 }

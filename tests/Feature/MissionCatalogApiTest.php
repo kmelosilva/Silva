@@ -136,7 +136,7 @@ class MissionCatalogApiTest extends TestCase
         $mission = $response->json('data.0');
 
         $this->assertSame(
-            ['id', 'slug', 'title', 'description', 'category', 'coordinates_count', 'xp_total', 'coordinates'],
+            ['id', 'slug', 'title', 'description', 'briefing', 'category', 'coordinates_count', 'xp_total', 'coordinates'],
             array_keys($mission)
         );
         $this->assertSame(['key', 'label'], array_keys($mission['category']));
@@ -158,6 +158,26 @@ class MissionCatalogApiTest extends TestCase
         $this->assertContains('acorde-meia-hora-antes', $withNotice->pluck('slug')->all());
         $this->assertSame([Coordinate::CARE_NOTICE], $withNotice->pluck('care_notice')->unique()->values()->all());
         $this->assertGreaterThan($withNotice->count(), $coordinates->count(), 'Coordenada sem esforço fica sem aviso.');
+    }
+
+    public function test_rf02_toda_missao_dos_modulos_traz_o_briefing_do_submentor(): void
+    {
+        $this->signIn();
+
+        foreach ($this->getJson('/api/missions')->assertOk()->json('data') as $mission) {
+            $this->assertIsString($mission['briefing'], "A missão {$mission['slug']} deveria ter briefing.");
+            $this->assertNotSame('', trim($mission['briefing']));
+        }
+        $this->assertNull($this->getJson('/api/missions/entry')->assertOk()->json('data.briefing'), 'Na entrada, fala o Agente Silva.');
+    }
+
+    public function test_rf02_missao_sem_briefing_vem_com_nulo_e_continua_aceitando(): void
+    {
+        $this->signIn();
+        Mission::where('slug', 'gerindo-recursos')->update(['briefing' => null]);
+
+        $this->assertNull($this->listed('gerindo-recursos')['briefing']);
+        $this->postJson('/api/missions/gerindo-recursos/accept')->assertCreated();
     }
 
     public function test_rnf05_missoes_aceitas_continuam_respondendo_depois_da_carga(): void

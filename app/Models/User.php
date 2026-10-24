@@ -84,4 +84,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(CoordinateCompletion::class);
     }
+
+    public function reflections(): HasMany
+    {
+        return $this->hasMany(Reflection::class);
+    }
 }

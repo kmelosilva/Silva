@@ -16,6 +16,7 @@ class Mission extends Model
         'slug',
         'title',
         'description',
+        'briefing',
         'category',
         'is_entry',
         'position',

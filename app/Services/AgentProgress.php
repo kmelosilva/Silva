@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Models\UserMission;
 use App\Support\AgentDay;
 use App\Support\LevelCurve;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -28,7 +29,7 @@ class AgentProgress
      */
     public function missionsOf(User $user): Collection
     {
-        $completedIds = $this->completedCoordinateIds($user);
+        $completedAt = $this->completionTimes($user);
 
         return $user->missions()
             ->with('mission.publishedCoordinates')
@@ -38,7 +39,7 @@ class AgentProgress
             ->map(fn (UserMission $userMission) => $this->progressFor(
                 $userMission,
                 $userMission->mission->publishedCoordinates,
-                $completedIds,
+                $completedAt,
             ));
     }
 
@@ -85,15 +86,15 @@ class AgentProgress
             $userMission->setRelation('mission', $mission);
 
             $published = $mission->publishedCoordinates()->get();
-            $completedIds = $this->completedCoordinateIds($user);
+            $completedAt = $this->completionTimes($user);
 
-            if (in_array($coordinate->id, $completedIds, true)) {
+            if (isset($completedAt[$coordinate->id])) {
                 return new CompletionResult(
-                    $this->progressFor($userMission, $published, $completedIds), $agent, 0, 0, false, true,
+                    $this->progressFor($userMission, $published, $completedAt), $agent, 0, 0, false, true,
                 );
             }
 
-            $progress = $this->progressFor($userMission, $published, $completedIds);
+            $progress = $this->progressFor($userMission, $published, $completedAt);
 
             if (! $progress->nextCoordinate?->is($coordinate)) {
                 $number = $published->search(fn (Coordinate $item) => $item->is($progress->nextCoordinate)) + 1;
@@ -101,13 +102,13 @@ class AgentProgress
                 throw ProgressRefused::outOfOrder($progress->nextCoordinate, $number);
             }
 
-            CoordinateCompletion::create([
+            $completion = CoordinateCompletion::create([
                 'user_id' => $user->id,
                 'coordinate_id' => $coordinate->id,
                 'xp' => $coordinate->xp,
                 'completed_at' => now(),
             ]);
-            $completedIds[] = $coordinate->id;
+            $completedAt[$coordinate->id] = $completion->completed_at;
 
             $levelBefore = $agent->level;
             $agent->xp += $coordinate->xp;
@@ -115,7 +116,7 @@ class AgentProgress
             $this->countActiveDay($agent);
             $agent->save();
 
-            $progress = $this->progressFor($userMission, $published, $completedIds);
+            $progress = $this->progressFor($userMission, $published, $completedAt);
             $missionCompleted = $progress->nextCoordinate === null && $userMission->completed_at === null;
 
             if ($missionCompleted) {
@@ -146,25 +147,31 @@ class AgentProgress
 
     /**
      * @param  Collection<int, Coordinate>  $published  as coordenadas publicadas da missão, em ordem
-     * @param  array<int, int>  $completedIds
+     * @param  array<int, CarbonInterface>  $completedAt  quando o agente cumpriu cada coordenada, pelo id
      */
-    private function progressFor(UserMission $userMission, Collection $published, array $completedIds): MissionProgress
+    private function progressFor(UserMission $userMission, Collection $published, array $completedAt): MissionProgress
     {
         [$completed, $pending] = $published->partition(
-            fn (Coordinate $coordinate) => in_array($coordinate->id, $completedIds, true)
+            fn (Coordinate $coordinate) => isset($completedAt[$coordinate->id])
         );
 
-        return new MissionProgress($userMission, $completed->values(), $pending->first());
+        // A última atividade na missão: a última coordenada cumprida, ou o aceite.
+        $lastActivityAt = $completed->map(fn (Coordinate $coordinate) => $completedAt[$coordinate->id])->max()
+            ?? $userMission->accepted_at;
+
+        return new MissionProgress($userMission, $completed->values(), $pending->first(), $lastActivityAt);
     }
 
     /**
-     * @return array<int, int>
+     * Quando o agente cumpriu cada coordenada, pelo id dela.
+     *
+     * @return array<int, CarbonInterface>
      */
-    private function completedCoordinateIds(User $user): array
+    private function completionTimes(User $user): array
     {
         return $user->coordinateCompletions()
-            ->pluck('coordinate_id')
-            ->map(fn ($id) => (int) $id)
+            ->get(['coordinate_id', 'completed_at'])
+            ->mapWithKeys(fn (CoordinateCompletion $completion) => [(int) $completion->coordinate_id => $completion->completed_at])
             ->all();
     }
 }
