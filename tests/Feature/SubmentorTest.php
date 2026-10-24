@@ -18,9 +18,6 @@ class SubmentorTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** Saudação que marca o gênero do agente (RN-16). */
-    private const GENDERED_GREETING = '/\bbem[- ]?vind[oa]s?\b/iu';
-
     public function test_sem_login_responde_401(): void
     {
         $this->getJson('/api/submentors')->assertUnauthorized();
@@ -128,7 +125,7 @@ class SubmentorTest extends TestCase
     public function test_rn16_nenhuma_fala_marca_o_genero_do_agente_na_saudacao(): void
     {
         foreach ($this->textsTheAgentReads() as $where => $text) {
-            $this->assertDoesNotMatchRegularExpression(self::GENDERED_GREETING, $text, "Saudação com gênero em {$where}");
+            $this->assertDoesNotMatchRegularExpression(MentoringText::GENDERED_GREETING, $text, "Saudação com gênero em {$where}");
         }
     }
 
@@ -138,7 +135,7 @@ class SubmentorTest extends TestCase
 
         $this->assertCount(8, $briefings);
         foreach ($briefings as $slug => $briefing) {
-            $this->assertDoesNotMatchRegularExpression(self::GENDERED_GREETING, $briefing, "Saudação com gênero no briefing de {$slug}");
+            $this->assertDoesNotMatchRegularExpression(MentoringText::GENDERED_GREETING, $briefing, "Saudação com gênero no briefing de {$slug}");
         }
     }
 

@@ -12,6 +12,12 @@ use App\Enums\Category;
 final class MentoringText
 {
     /**
+     * Saudação que marca o gênero do agente (RN-16): a Agência não sabe quem chega.
+     * Vale para os textos escritos (teste) e para a resposta da IA (checagem).
+     */
+    public const GENDERED_GREETING = '/\bbem[- ]?vind[oa]s?\b/iu';
+
+    /**
      * O submentor da área, com codinome, bicho, power-up, apresentação, voz, fechamento,
      * boas-vindas e respostas escritas.
      *

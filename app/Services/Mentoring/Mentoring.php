@@ -10,11 +10,15 @@ use App\Models\CoordinateCompletion;
 use App\Models\Mission;
 use App\Models\Reflection;
 use App\Models\User;
+use App\Support\AdviceRules;
 use App\Support\CareSignals;
+use App\Support\ContentRules;
 use App\Support\MentoringText;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * A mentoria dos submentores do Ninho: quem o agente conhece, a reflexão sobre a
@@ -30,6 +34,13 @@ class Mentoring
     private const LOCK_SECONDS = 20;
 
     private const LOCK_WAIT_SECONDS = 15;
+
+    /** A forma da resposta da IA (D-07, etapa 4). */
+    private const REPLY_MAX_SENTENCES = 3;
+
+    private const REPLY_MAX_CHARS = 400;
+
+    public function __construct(private readonly AiBudget $budget) {}
 
     /**
      * As áreas que têm submentor: as que têm pelo menos uma missão nos módulos, na ordem
@@ -96,15 +107,24 @@ class Mentoring
                     // Antes do alistamento não há codinome; o nome da conta nunca vai para a IA (RNF-06).
                     $user->ensureAgent()->codename ?? 'agente',
                     "{$user->id}|{$coordinate->id}",
+                    aiAlreadyCalled: $completion->ai_replied_at !== null,
+                    userId: $user->id,
                 );
 
-                return Reflection::create([
-                    'user_id' => $user->id,
-                    'coordinate_completion_id' => $completion->id,
-                    'text' => $text,
-                    'reply' => $answer->text,
-                    'reply_source' => $answer->source,
-                ]);
+                return DB::transaction(function () use ($user, $completion, $text, $answer) {
+                    if ($answer->calledAi) {
+                        // Fica mesmo se a reflexão for apagada: uma chamada por coordenada.
+                        $completion->update(['ai_replied_at' => now()]);
+                    }
+
+                    return Reflection::create([
+                        'user_id' => $user->id,
+                        'coordinate_completion_id' => $completion->id,
+                        'text' => $text,
+                        'reply' => $answer->text,
+                        'reply_source' => $answer->source,
+                    ]);
+                });
             });
     }
 
@@ -150,27 +170,89 @@ class Mentoring
     }
 
     /**
-     * A resposta à reflexão, passando pelas barreiras na ordem (D-07). Não grava nada: o
-     * comando de avaliação usa as mesmas barreiras.
+     * A resposta à reflexão, passando pelas cinco barreiras na ordem (D-07). Não grava a
+     * reflexão: o comando de avaliação usa as mesmas barreiras. Só registra a chamada à IA,
+     * quando ela acontece, em ai_calls.
      *
      * @param  string  $writtenKey  escolhe a resposta escrita: o mesmo caso dá sempre o mesmo texto
+     * @param  bool  $aiAlreadyCalled  a IA já foi chamada para esta coordenada (RN-06)
      */
-    public function answer(Mission $mission, Coordinate $coordinate, string $text, string $codename, string $writtenKey): Answer
-    {
-        // 1. Sinal de risco: cuidado, sem chamar a IA.
+    public function answer(
+        Mission $mission,
+        Coordinate $coordinate,
+        string $text,
+        string $codename,
+        string $writtenKey,
+        bool $aiAlreadyCalled = false,
+        ?int $userId = null,
+    ): Answer {
+        // 1. Sinal de risco: cuidado, sem chamar a IA. Funciona com a IA desligada ou sem verba.
         if (CareSignals::found($text)) {
             return Answer::care(MentoringText::care()['message']);
         }
 
-        // 2. IA desligada: o texto escrito do submentor.
-        return $this->writtenAnswer($mission->category, $codename, $writtenKey);
+        // 2. Chave geral, chave da API, chamada já feita nesta coordenada e teto do mês.
+        if (
+            ! config('mentoring.enabled')
+            || (string) config('services.anthropic.key') === ''
+            || $aiAlreadyCalled
+            || $this->budget->reached()
+        ) {
+            return $this->writtenAnswer($mission->category, $codename, $writtenKey);
+        }
+
+        // 3. A chamada. O modelo é pedido só agora: montar o cliente custa, e os outros
+        // caminhos não precisam dele.
+        $prompt = MentorPrompt::for($mission, $coordinate, $codename, $text);
+        $startedAt = hrtime(true);
+
+        try {
+            $reply = app(MentorModel::class)->reply($prompt);
+        } catch (Throwable $exception) {
+            // 5. Falha que escapou do modelo. Só a classe vai para o log, nunca o texto.
+            Log::warning('Mentoria: a chamada à IA falhou.', ['exception' => $exception::class]);
+            $reply = new MentorReply(
+                MentorReply::ERROR, null, (string) config('mentoring.model'), 0, 0,
+                (int) round((hrtime(true) - $startedAt) / 1_000_000),
+            );
+        }
+
+        // 4. A resposta passa pelas regras da Agência antes de chegar ao agente.
+        $outcome = $reply->outcome === MentorReply::REPLY && ! $this->acceptable((string) $reply->text)
+            ? 'blocked'
+            : $reply->outcome;
+        $this->budget->record($reply, $outcome, $userId);
+
+        return match ($outcome) {
+            MentorReply::REPLY => Answer::ai($reply->text),
+            MentorReply::CARE => Answer::care(MentoringText::care()['message'], calledAi: true),
+            // 5. Barrada, recusada, fora do esquema, tempo esgotado ou erro: o texto escrito.
+            default => $this->writtenAnswer($mission->category, $codename, $writtenKey, calledAi: true),
+        };
     }
 
-    private function writtenAnswer(Category $area, string $codename, string $key): Answer
+    /**
+     * A resposta da IA só passa sem termo proibido, sem conselho profissional, sem saudação
+     * com gênero e na forma combinada: não vazia, até 3 frases e até 400 caracteres.
+     */
+    private function acceptable(string $reply): bool
+    {
+        $reply = trim($reply);
+        $sentences = preg_split('/(?<=[.!?…])\s+/u', $reply, -1, PREG_SPLIT_NO_EMPTY);
+
+        return $reply !== ''
+            && mb_strlen($reply) <= self::REPLY_MAX_CHARS
+            && count($sentences) <= self::REPLY_MAX_SENTENCES
+            && ContentRules::forbiddenTermsIn($reply) === []
+            && AdviceRules::termsIn($reply) === []
+            && preg_match(MentoringText::GENDERED_GREETING, $reply) !== 1;
+    }
+
+    private function writtenAnswer(Category $area, string $codename, string $key, bool $calledAi = false): Answer
     {
         $replies = MentoringText::submentor($area)['written_replies'];
         $reply = $replies[crc32($key) % count($replies)];
 
-        return Answer::written(strtr($reply, [':codinome' => $codename]));
+        return Answer::written(strtr($reply, [':codinome' => $codename]), $calledAi);
     }
 }
