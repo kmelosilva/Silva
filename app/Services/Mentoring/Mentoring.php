@@ -93,7 +93,8 @@ class Mentoring
                     $mission,
                     $coordinate,
                     $text,
-                    $user->ensureAgent()->codename ?? $user->name,
+                    // Antes do alistamento não há codinome; o nome da conta nunca vai para a IA (RNF-06).
+                    $user->ensureAgent()->codename ?? 'agente',
                     "{$user->id}|{$coordinate->id}",
                 );
 

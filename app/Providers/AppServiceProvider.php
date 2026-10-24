@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Services\Mentoring\ClaudeMentorModel;
+use App\Services\Mentoring\MentorModel;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -14,7 +16,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // A resposta do submentor à reflexão (spec mentoria_submentores, D-05).
+        $this->app->bind(MentorModel::class, fn () => ClaudeMentorModel::fromConfig());
     }
 
     /**
