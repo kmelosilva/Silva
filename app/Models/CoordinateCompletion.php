@@ -4,9 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * Uma coordenada cumprida por um agente, com o XP creditado naquele momento.
+ * ai_replied_at marca que a IA já respondeu a uma reflexão sobre ela, e fica mesmo
+ * depois de a reflexão ser apagada (uma resposta por IA por coordenada).
  */
 class CoordinateCompletion extends Model
 {
@@ -15,6 +18,7 @@ class CoordinateCompletion extends Model
         'coordinate_id',
         'xp',
         'completed_at',
+        'ai_replied_at',
     ];
 
     protected function casts(): array
@@ -22,6 +26,7 @@ class CoordinateCompletion extends Model
         return [
             'xp' => 'integer',
             'completed_at' => 'datetime',
+            'ai_replied_at' => 'datetime',
         ];
     }
 
@@ -33,5 +38,10 @@ class CoordinateCompletion extends Model
     public function coordinate(): BelongsTo
     {
         return $this->belongsTo(Coordinate::class);
+    }
+
+    public function reflection(): HasOne
+    {
+        return $this->hasOne(Reflection::class);
     }
 }

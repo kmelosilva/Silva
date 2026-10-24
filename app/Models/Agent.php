@@ -21,6 +21,7 @@ class Agent extends Model
         'last_active_on',
         'codename',
         'priorities',
+        'submentors_met',
         'oath_accepted_at',
         'enlisted_at',
     ];
@@ -44,6 +45,7 @@ class Agent extends Model
             'streak_current' => 'integer',
             'streak_best' => 'integer',
             'priorities' => AsEnumCollection::of(Category::class),
+            'submentors_met' => AsEnumCollection::of(Category::class),
             'oath_accepted_at' => 'datetime',
             'enlisted_at' => 'datetime',
         ];
@@ -73,5 +75,15 @@ class Agent extends Model
     public function priorityAreas(): Collection
     {
         return $this->priorities ?? new Collection;
+    }
+
+    /**
+     * As áreas cujo submentor o agente já conheceu, sempre como coleção.
+     *
+     * @return Collection<int, Category>
+     */
+    public function metSubmentors(): Collection
+    {
+        return $this->submentors_met ?? new Collection;
     }
 }
