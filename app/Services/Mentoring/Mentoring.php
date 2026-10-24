@@ -218,7 +218,7 @@ class Mentoring
         }
 
         // 4. A resposta passa pelas regras da Agência antes de chegar ao agente.
-        $outcome = $reply->outcome === MentorReply::REPLY && ! $this->acceptable((string) $reply->text)
+        $outcome = $reply->outcome === MentorReply::REPLY && $this->replyProblems((string) $reply->text) !== []
             ? 'blocked'
             : $reply->outcome;
         $this->budget->record($reply, $outcome, $userId);
@@ -232,20 +232,27 @@ class Mentoring
     }
 
     /**
-     * A resposta da IA só passa sem termo proibido, sem conselho profissional, sem saudação
-     * com gênero e na forma combinada: não vazia, até 3 frases e até 400 caracteres.
+     * O que a checagem barra na resposta da IA (D-07, etapa 4): termo proibido, conselho
+     * profissional, saudação com gênero e a forma combinada (não vazia, até 3 frases e até
+     * 400 caracteres). Vazio quando a resposta passa. O comando de avaliação usa o mesmo.
+     *
+     * @return list<string>
      */
-    private function acceptable(string $reply): bool
+    public function replyProblems(string $reply): array
     {
         $reply = trim($reply);
-        $sentences = preg_split('/(?<=[.!?…])\s+/u', $reply, -1, PREG_SPLIT_NO_EMPTY);
+        $sentences = count(preg_split('/(?<=[.!?…])\s+/u', $reply, -1, PREG_SPLIT_NO_EMPTY));
+        $terms = ContentRules::forbiddenTermsIn($reply);
+        $advice = AdviceRules::termsIn($reply);
 
-        return $reply !== ''
-            && mb_strlen($reply) <= self::REPLY_MAX_CHARS
-            && count($sentences) <= self::REPLY_MAX_SENTENCES
-            && ContentRules::forbiddenTermsIn($reply) === []
-            && AdviceRules::termsIn($reply) === []
-            && preg_match(MentoringText::GENDERED_GREETING, $reply) !== 1;
+        return array_values(array_filter([
+            $reply === '' ? 'vazia' : null,
+            $terms !== [] ? 'termo proibido: '.implode(', ', $terms) : null,
+            $advice !== [] ? 'conselho: '.implode(', ', $advice) : null,
+            preg_match(MentoringText::GENDERED_GREETING, $reply) === 1 ? 'saudação com gênero' : null,
+            $sentences > self::REPLY_MAX_SENTENCES ? "{$sentences} frases" : null,
+            mb_strlen($reply) > self::REPLY_MAX_CHARS ? mb_strlen($reply).' caracteres' : null,
+        ]));
     }
 
     private function writtenAnswer(Category $area, string $codename, string $key, bool $calledAi = false): Answer
